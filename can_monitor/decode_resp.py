@@ -1,6 +1,5 @@
 import can
 
-
 def decode_rpm(msg: can.Message) -> float:
     """PID 0x0C — Engine RPM (resolution: 0.25 RPM)"""
     if not (
