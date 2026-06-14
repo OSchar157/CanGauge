@@ -1,11 +1,14 @@
 import can
 
-def decode_rpm(msg: can.Message) -> float:
+ENGINE_SPEED_RESPONSE_ID  = 0x0C
+VEHICLE_SPEED_RESPONSE_ID = 0x0D
+
+def decode_engine_speed(msg: can.Message) -> float:
     """PID 0x0C — Engine RPM (resolution: 0.25 RPM)"""
     if not (
         len(msg.data) >= 5 and
         msg.data[1] == 0x41 and
-        msg.data[2] == 0x0C
+        msg.data[2] == ENGINE_SPEED_RESPONSE_ID
     ):
         return -1
 
@@ -50,7 +53,7 @@ def decode_vehicle_speed(msg: can.Message) -> float:
     if not (
         len(msg.data) >= 4 and
         msg.data[1] == 0x41 and
-        msg.data[2] == 0x0D
+        msg.data[2] == VEHICLE_SPEED_RESPONSE_ID
     ):
         return -1
 

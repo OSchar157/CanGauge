@@ -6,7 +6,7 @@ wake_msg = can.Message(
     is_extended_id=False
 )
 
-rpm_req = can.Message(
+engine_speed_req = can.Message(
     arbitration_id=0x7DF,
     data=[0x02, 0x01, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00],
     is_extended_id=False

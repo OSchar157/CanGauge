@@ -15,7 +15,6 @@ class RPMGaugeWidget(QWidget):
     ----------
     min_val   : minimum value on the gauge
     max_val   : maximum value on the gauge
-    unit      : label shown at the bottom (e.g. "RPM", "km/h")
     warn_val  : value at which tick marks turn orange  (None = no warning zone)
     danger_val: value at which tick marks turn red     (None = no danger zone)
     """
@@ -24,14 +23,13 @@ class RPMGaugeWidget(QWidget):
         self,
         min_val=0,
         max_val=8000,
-        unit="RPM",
         warn_val=6000,
         danger_val=7000,
         parent=None,
     ):
         super().__init__(parent)
         self.max_val = max_val
-        self.unit = unit
+        self.unit = "RPM"
         self.warn_val = warn_val
         self.danger_val = danger_val
         self.min_val = min_val
