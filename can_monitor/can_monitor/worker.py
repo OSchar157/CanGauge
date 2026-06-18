@@ -1,13 +1,22 @@
 from PyQt5.QtCore import QThread, pyqtSignal
-
+import time
 from .decode_resp import decode_engine_speed, decode_vehicle_speed
-from .requests import (
-    engine_speed_req, vehicle_speed_req, engine_coolant_temp_req
-    )
+from .pid_registry import PID_REGISTRY
+from .poll_reqs import poll_all
+
 
 class CANWorker(QThread):
     engine_speed_updated = pyqtSignal(float)
     vehicle_speed_updated = pyqtSignal(float)
+    manifold_pressure_updated = pyqtSignal(float)
+    throttle_position_updated = pyqtSignal(float)
+    engine_load_updated = pyqtSignal(float)
+    fuel_level_updated = pyqtSignal(float)
+    intake_air_temp_updated = pyqtSignal(float)
+    maf_air_flow_updated = pyqtSignal(float)
+    timing_advance_updated = pyqtSignal(float)
+    barometric_pressure_updated = pyqtSignal(float)
+
 
     def __init__(self, bus):
         super().__init__()
@@ -16,30 +25,31 @@ class CANWorker(QThread):
 
     def run(self):
         self.running = True
-        last_slow_poll = 0
 
         while self.running:
-            # flush stale messages
-            while self.bus.recv(timeout=0) is not None:
-                pass
+            results = poll_all(self.bus, ['engine_speed', 'vehicle_speed'])
 
-            # fast signals — every loop
-            self.bus.send(engine_speed_req)
-            self.bus.send(vehicle_speed_req)
-
-            # slow signals — every 5 seconds
-            # curr_time = time.time()
-            # if curr_time - last_slow_poll > 5:
-            #     self.bus.send(engine_coolant_temp_req)
-            #     last_slow_poll = curr_time
-            
-            for _ in range(2):
-                msg = self.bus.recv(timeout=1.0)
-                if msg:
-                    if msg.data[2] == 0x0C:  # RPM pid
-                        self.engine_speed_updated.emit(decode_engine_speed(msg))
-                    elif msg.data[2] == 0x0D:  # speed pid
-                        self.vehicle_speed_updated.emit(decode_vehicle_speed(msg))
+            for key, value in results.items():
+                if key == 'engine_speed':
+                    self.engine_speed_updated.emit(value)
+                elif key == 'vehicle_speed':
+                    self.vehicle_speed_updated.emit(value)
+                elif key == 'manifold_pressure':
+                    self.manifold_pressure_updated.emit(value)
+                elif key == 'throttle_position':
+                    self.throttle_position_updated.emit(value)
+                elif key == 'engine_load':
+                    self.engine_load_updated.emit(value)
+                elif key == 'fuel_level':
+                    self.fuel_level_updated.emit(value)
+                elif key == 'intake_air_temp':
+                    self.intake_air_temp_updated.emit(value)
+                elif key == 'maf_air_flow':
+                    self.maf_air_flow_updated.emit(value)
+                elif key == 'timing_advance':
+                    self.timing_advance_updated.emit(value)
+                elif key == 'barometric_pressure':
+                    self.barometric_pressure_updated.emit(value)
 
     def stop(self):
         self.running = False

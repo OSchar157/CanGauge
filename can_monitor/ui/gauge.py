@@ -33,7 +33,7 @@ class MainWindow(QWidget):
         # vehicle speed Text
         self.vehicle_speed_text_disp = QLineEdit("0")
         self.vehicle_speed_text_disp.setReadOnly(True)
-        self.vehicle_speed_text_disp.setStyleSheet("font-size: 48px; font-weight: bold;")
+        # self.vehicle_speed_text_disp.setStyleSheet("font-size: 48px; font-weight: bold;")
         text_layout.addWidget(self.vehicle_speed_text_disp)
 
         # RPM Gauge
@@ -43,7 +43,7 @@ class MainWindow(QWidget):
         # Speedometer
         self.speedometer = SpeedometerWidget(min_val=0, max_val=140)
         gauge_layout.addWidget(self.speedometer)
-        
+
         self.setLayout(master)
 
 if __name__ == "__main__":

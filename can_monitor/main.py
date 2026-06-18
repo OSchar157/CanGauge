@@ -16,14 +16,14 @@ os.system(f'sudo ifconfig {bus_name} up')
 bus = can.interface.Bus(channel=bus_name, interface='socketcan')
 worker = CANWorker(bus)
 
-app = QApplication(sys.argv)  # must be before any widgets
+app = QApplication(sys.argv)
 window = MainWindow()
 
 worker.engine_speed_updated.connect(window.rpm_gauge.set_value)
 worker.engine_speed_updated.connect(lambda v: window.engine_speed_text_disp.setText(str(round(v, 1))))
 
-worker.vehicle_speed_updated.connect(window.speedometer.set_value)
-worker.vehicle_speed_updated.connect(lambda v: window.vehicle_speed_text_disp.setText(str(round(v * 0.621371, 1))))
+worker.vehicle_speed_updated.connect(lambda kph: window.speedometer.set_value(kph * 0.621371))
+worker.vehicle_speed_updated.connect(lambda kph: window.vehicle_speed_text_disp.setText(str(round(kph * 0.621371, 1))))
 
 worker.start()
 window.show()

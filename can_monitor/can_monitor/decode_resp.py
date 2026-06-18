@@ -2,6 +2,8 @@ import can
 
 ENGINE_SPEED_RESPONSE_ID  = 0x0C
 VEHICLE_SPEED_RESPONSE_ID = 0x0D
+THROTTLE_POSITION_RESPONSE_ID = 0x11
+
 
 def decode_engine_speed(msg: can.Message) -> float:
     """PID 0x0C — Engine RPM (resolution: 0.25 RPM)"""
@@ -67,7 +69,7 @@ def decode_throttle_position(msg: can.Message) -> float:
     if not (
         len(msg.data) >= 4 and
         msg.data[1] == 0x41 and
-        msg.data[2] == 0x11
+        msg.data[2] == THROTTLE_POSITION_RESPONSE_ID
     ):
         return -1
 
@@ -147,20 +149,20 @@ def decode_timing_advance(msg: can.Message) -> float:
     return (A / 2) - 64
 
 
-def decode_o2_sensor_voltage(msg: can.Message, sensor_pid: int = 0x14) -> float:
-    """PIDs 0x14-0x1B — O2 Sensor Voltage in V (range: 0-1.275V).
-    Pass sensor_pid for the specific sensor (0x14=Bank1/S1 ... 0x1B=Bank2/S4)."""
-    if not (
-        len(msg.data) >= 4 and
-        msg.data[1] == 0x41 and
-        msg.data[2] == sensor_pid and
-        0x14 <= sensor_pid <= 0x1B
-    ):
-        return -1
+# def decode_o2_sensor_voltage(msg: can.Message, sensor_pid: int = 0x14) -> float:
+#     """PIDs 0x14-0x1B — O2 Sensor Voltage in V (range: 0-1.275V).
+#     Pass sensor_pid for the specific sensor (0x14=Bank1/S1 ... 0x1B=Bank2/S4)."""
+#     if not (
+#         len(msg.data) >= 4 and
+#         msg.data[1] == 0x41 and
+#         msg.data[2] == sensor_pid and
+#         0x14 <= sensor_pid <= 0x1B
+#     ):
+#         return -1
 
-    A = msg.data[3]
+#     A = msg.data[3]
 
-    return A / 200
+#     return A / 200
 
 
 def decode_barometric_pressure(msg: can.Message) -> float:
