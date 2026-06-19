@@ -1,8 +1,5 @@
 from PyQt5.QtCore import QThread, pyqtSignal
-import time
-from .decode_resp import decode_engine_speed, decode_vehicle_speed
-from .pid_registry import PID_REGISTRY
-from .poll_reqs import poll_all
+import cantools
 
 
 class CANWorker(QThread):
@@ -22,34 +19,27 @@ class CANWorker(QThread):
         super().__init__()
         self.bus = bus
         self.running = False
+        self.db = cantools.database.Database()
+        self.db.add_dbc_string(open('subaru_global.dbc').read())
 
     def run(self):
         self.running = True
 
         while self.running:
-            results = poll_all(self.bus, ['engine_speed', 'vehicle_speed'])
+            msg = self.bus.recv(timeout=0.1)
 
-            for key, value in results.items():
-                if key == 'engine_speed':
-                    self.engine_speed_updated.emit(value)
-                elif key == 'vehicle_speed':
-                    self.vehicle_speed_updated.emit(value)
-                elif key == 'manifold_pressure':
-                    self.manifold_pressure_updated.emit(value)
-                elif key == 'throttle_position':
-                    self.throttle_position_updated.emit(value)
-                elif key == 'engine_load':
-                    self.engine_load_updated.emit(value)
-                elif key == 'fuel_level':
-                    self.fuel_level_updated.emit(value)
-                elif key == 'intake_air_temp':
-                    self.intake_air_temp_updated.emit(value)
-                elif key == 'maf_air_flow':
-                    self.maf_air_flow_updated.emit(value)
-                elif key == 'timing_advance':
-                    self.timing_advance_updated.emit(value)
-                elif key == 'barometric_pressure':
-                    self.barometric_pressure_updated.emit(value)
+            if msg is None:
+                continue
+            
+            try:
+                decoded = self.db.decode_message(msg.arbitration_id, msg.data)
+                if 'Engine_RPM' in decoded:
+                    self.engine_speed_updated.emit(decoded['Engine_RPM'])
+                if 'FL' in decoded:
+                    speed = (decoded['FL'] + decoded['FR'] + decoded['RL'] + decoded['RR']) / 4
+                    self.vehicle_speed_updated.emit(speed)
+            except KeyError:
+                pass  # message not in DBC, skip it
 
     def stop(self):
         self.running = False

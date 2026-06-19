@@ -92,22 +92,27 @@ class SpeedometerWidget(QWidget):
         num_minor = 3  # minor ticks between each major
 
         total_ticks = num_major * num_minor + num_major
+        middle_minor = (num_minor + 1) // 2  # index within group that is middle
 
         for i in range(total_ticks + 1):
             frac = i / total_ticks
             angle = math.radians(225 - frac * 270)
 
             is_major = (i % (num_minor + 1) == 0)
+            position_in_group = i % (num_minor + 1)
+            is_middle_minor = (not is_major) and (num_minor % 2 == 1) and (position_in_group == middle_minor)
 
             if is_major:
                 inner_r, outer_r = 62, 76
                 width = 1.5
+            elif is_middle_minor:
+                inner_r, outer_r = 65, 76  # slightly longer than regular minor
+                width = 1.1
             else:
                 inner_r, outer_r = 68, 76
                 width = 0.8
 
             color = QColor("#ffffff")
-
             pen = QPen(color)
             pen.setWidthF(width)
             pen.setCapStyle(Qt.RoundCap)
