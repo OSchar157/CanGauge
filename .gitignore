@@ -3,3 +3,4 @@
 __pycache__/
 subaru_global.dbc
 analyze_can_data/
+can_gauge_app/ui/pages/can_stream_test.py
