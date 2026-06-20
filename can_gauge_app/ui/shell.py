@@ -61,3 +61,4 @@ class Shell(QWidget):
 
     def show_page(self, name: str):
         self.pages.setCurrentIndex(self._page_index[name])
+        self.side_menu.setVisible(False)

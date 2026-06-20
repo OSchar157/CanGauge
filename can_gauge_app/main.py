@@ -7,7 +7,7 @@ from demo.demo_worker import DemoCANWoker
 
 from ui.shell import Shell
 from ui.pages.gauge import GaugePage
-from ui.pages.can_stream_test import CanStreamPage
+from ui.pages.can_stream import CanStreamPage
 
 bitrate = 500000
 using_can0 = True
@@ -48,8 +48,10 @@ if __name__ == "__main__":
         worker = init_can()
     elif len(sys.argv) == 2 and sys.argv[1] == "test":
         worker = DemoCANWoker()
+    elif len(sys.argv) == 3 and sys.argv[1] == "test" and int(sys.argv[2]):
+        worker = DemoCANWoker(int(sys.argv[2]))
     else:
-        print("usage: python main.py ['test']")
+        print("usage: python main.py ['test'] [100]")
         sys.exit(1)
     
     init_workers(worker, gauge_page, can_stream_page)

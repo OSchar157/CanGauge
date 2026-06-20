@@ -4,8 +4,9 @@ from PyQt5.QtCore import QThread
 from can_monitor.worker import CANWorker
 
 class DemoCANWoker(CANWorker):
-    def __init__(self,):
+    def __init__(self, speed: int=100):
         super().__init__(bus=None)
+        self.speed = speed
     
     def run(self):
         self.running = True
@@ -29,4 +30,4 @@ class DemoCANWoker(CANWorker):
                     except KeyError:
                         pass  # message not in DBC, skip it
 
-                    QThread.msleep(1)
+                    QThread.msleep(self.speed)
