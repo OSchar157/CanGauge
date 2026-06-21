@@ -25,31 +25,33 @@ class Shell(QWidget):
         self.side_menu.buttons["Live CAN Stream"].clicked.connect(lambda: self.show_page("canstream"))
         self.side_menu.buttons["Gauge Display"].clicked.connect(lambda: self.show_page("gauge"))
         self.side_menu.buttons["Exit"].clicked.connect(QApplication.quit)
-        self.side_menu.buttons["log viewer"].clicked.connect(lambda: self.show_page("logviewer"))
+        self.side_menu.buttons["log viewer"].clicked.connect(lambda: self.show_page("raw_can_stream"))
 
         self._page_index = {}
 
-        self.tap_timer = QElapsedTimer()
-        self.tap_timer.start()
-        self.last_tap_valid = False
-        self.double_tap_threshold = 400  # ms
+        # self.tap_timer = QElapsedTimer()
+        # self.tap_timer.start()
+        # self.last_tap_valid = False
+        # self.double_tap_threshold = 400  # ms
     
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
             self.showNormal()
         elif event.key() == Qt.Key_F:
             self.showFullScreen()
+        elif event.key() == Qt.Key_S:
+            self._set_side_menu_vis()
         elif event.key() == Qt.Key_Q:
             QApplication.quit() 
 
-    def mousePressEvent(self, event):
-        elapsed = self.tap_timer.elapsed()
-        if self.last_tap_valid and elapsed < self.double_tap_threshold:
-            self._set_side_menu_vis()
-            self.last_tap_valid = False  # reset so triple-tap doesn't trigger again
-        else:
-            self.last_tap_valid = True
-            self.tap_timer.restart()
+    # def mousePressEvent(self, event):
+    #     elapsed = self.tap_timer.elapsed()
+    #     if self.last_tap_valid and elapsed < self.double_tap_threshold:
+    #         self._set_side_menu_vis()
+    #         self.last_tap_valid = False  # reset so triple-tap doesn't trigger again
+    #     else:
+    #         self.last_tap_valid = True
+    #         self.tap_timer.restart()
     
     def _set_side_menu_vis(self):
         if self.side_menu.isVisible():

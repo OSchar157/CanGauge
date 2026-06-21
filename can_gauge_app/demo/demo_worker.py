@@ -11,13 +11,13 @@ class DemoCANWoker(CANWorker):
     def run(self):
         self.running = True
 
-        with can.LogReader("demo/trunced_can_dump.log") as log_file:
-            while self.running:
-                for msg in log_file:
+        while self.running:
+            with can.LogReader("demo/trunced_can_dump.log") as log_file:
+                    for msg in log_file:
 
-                    if msg is None:
-                        continue
+                        if msg is None:
+                            continue
 
-                    self.cur_message_updated.emit(msg)
+                        self.cur_message_updated.emit(msg)
 
-                    QThread.usleep(self.speed)
+                        QThread.usleep(self.speed)

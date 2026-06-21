@@ -2,14 +2,13 @@ import sys, os, can, cantools
 
 from PyQt5.QtWidgets import QApplication
 
-from decoding.decoder import FrameDecoder
+from decoding.decoder import MsgDecoder
 from can_monitor.worker import CANWorker
 from demo.demo_worker import DemoCANWoker
 
 from ui.shell import Shell
-from ui.pages.can_stream.can_stream import CanStreamPage
-from ui.pages.can_stream.raw_can_stream import LogViewer
 from ui.pages.gauge import GaugePage
+from ui.pages.can_stream.page import CanPage
 
 bitrate = 500000
 using_can0 = True
@@ -25,20 +24,10 @@ def init_interface() -> CANWorker:
 
     return worker
 
-def get_msg(msg):
-
-    # 1. Space-separated hex string (e.g., "0a 1b 2c ff")
-    hex_spaced = msg.data.hex(' ')
-
-    # 2. Continuous hex string (e.g., "0a1b2cff")
-    hex_continuous = msg.data.hex()
-    return hex_spaced
-
-def init_workers(worker: CANWorker, decoder: FrameDecoder, gauge_page: GaugePage, can_stream_page: CanStreamPage, log_viewer: LogViewer) -> None:
+def init_workers(worker: CANWorker, decoder: MsgDecoder, gauge_page: GaugePage, can_page: CanPage) -> None:
     worker.cur_message_updated.connect(decoder.on_raw_frame)
-    worker.cur_message_updated.connect(lambda msg: log_viewer.append_log_safe(get_msg(msg)))
-    decoder.frame_decoded.connect(gauge_page.on_frame)
-    # decoder.frame_decoded.connect(can_stream_page.on_frame)
+    decoder.frame_decoded.connect(gauge_page.on_msg)
+    decoder.frame_decoded.connect(can_page.on_msg)
     
     worker.start()
 
@@ -49,13 +38,12 @@ if __name__ == "__main__":
 
     shell = Shell()
     gauge_page = GaugePage()
-    can_stream_page = CanStreamPage()
-    log_viewer = LogViewer()
+    can_page = CanPage()
 
     shell.add_page("gauge", gauge_page)
-    shell.add_page("canstream", can_stream_page)
-    shell.add_page("logviewer", log_viewer)
-    shell.show_page("gauge")  # always opens here
+    shell.add_page("canpage", can_page)
+    # shell.show_page("gauge")  # always opens here
+    shell.show_page("canpage")
 
     if len(sys.argv) == 1:
         worker = init_interface()
@@ -69,10 +57,11 @@ if __name__ == "__main__":
     
     db = cantools.database.Database()
     db.add_dbc_string(open('../subaru_global.dbc').read())
-    decoder = FrameDecoder(db)
+    decoder = MsgDecoder(db)
 
-    init_workers(worker, decoder, gauge_page, can_stream_page, log_viewer)
+    init_workers(worker, decoder, gauge_page, can_page)
 
-    shell.showFullScreen()
-    # shell.showNormal()
+    # shell.showFullScreen()
+    shell.setFixedSize(1080, 648)
+    shell.showNormal()
     sys.exit(app.exec_())

@@ -3,7 +3,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 
 
 @dataclass
-class DecodedFrame:
+class DecodedMsg:
     can_id: int
     name: str | None
     timestamp: float
@@ -13,8 +13,8 @@ class DecodedFrame:
     signals: dict  # {signal_name: value}
 
 
-class FrameDecoder(QObject):
-    frame_decoded = pyqtSignal(DecodedFrame)  # DecodedFrame
+class MsgDecoder(QObject):
+    frame_decoded = pyqtSignal(DecodedMsg)
 
     def __init__(self, db):
         super().__init__()
@@ -29,7 +29,7 @@ class FrameDecoder(QObject):
             name = None
             signals = {}
 
-        decoded = DecodedFrame(
+        decoded = DecodedMsg(
             can_id=msg.arbitration_id,
             name=name,
             timestamp=msg.timestamp,

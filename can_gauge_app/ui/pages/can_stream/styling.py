@@ -1,0 +1,11 @@
+# ── palette (matches the dark cockpit look used elsewhere) ──
+BG = "#0a0b0e"
+ROW_BG = "#16181d"
+ROW_BG_LIGHT = "#1c1f25"
+ROW_BG_HOVER = "#4A5361"
+ROW_BORDER = "#262932"
+HEADER_FG = "#6f7480"
+TEXT_FG = "#d8dce5"
+ID_FG = "#7fd9c4"
+ACCENT = "#dc3c28"
+MONO = "Courier New"

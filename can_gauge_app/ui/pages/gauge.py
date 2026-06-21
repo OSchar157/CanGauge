@@ -7,6 +7,8 @@ from PyQt5.QtWidgets import (
 from ..widgets.rmp_gauge import RPMGaugeWidget
 from ..widgets.speedometer import SpeedometerWidget
 
+from decoding.decoder import DecodedMsg
+
 
 class GaugePage(QWidget):
     def __init__(self):
@@ -23,11 +25,11 @@ class GaugePage(QWidget):
         self.speedometer = SpeedometerWidget(min_val=0, max_val=140)
         master.addWidget(self.speedometer)
         
-    def on_frame(self, frame):
-        if 'Engine_RPM' in frame.signals:
-            self.rpm_gauge.set_value(frame.signals['Engine_RPM'])
-        elif all(k in frame.signals for k in ('FL', 'FR', 'RL', 'RR')):
-            speed = sum(frame.signals[k] for k in ('FL', 'FR', 'RL', 'RR')) / 4
+    def on_msg(self, msg: DecodedMsg):
+        if 'Engine_RPM' in msg.signals:
+            self.rpm_gauge.set_value(msg.signals['Engine_RPM'])
+        elif all(k in msg.signals for k in ('FL', 'FR', 'RL', 'RR')):
+            speed = sum(msg.signals[k] for k in ('FL', 'FR', 'RL', 'RR')) / 4
             self.speedometer.set_value(speed)
 
 if __name__ == "__main__":
