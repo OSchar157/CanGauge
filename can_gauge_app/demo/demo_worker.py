@@ -4,7 +4,7 @@ from PyQt5.QtCore import QThread
 from can_monitor.worker import CANWorker
 
 class DemoCANWoker(CANWorker):
-    def __init__(self, speed: int=100):
+    def __init__(self, speed: int=251):
         super().__init__(bus=None)
         self.speed = speed
     
@@ -20,4 +20,4 @@ class DemoCANWoker(CANWorker):
 
                     self.cur_message_updated.emit(msg)
 
-                    QThread.msleep(self.speed)
+                    QThread.usleep(self.speed)

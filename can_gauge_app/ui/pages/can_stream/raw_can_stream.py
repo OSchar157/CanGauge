@@ -10,7 +10,7 @@ class LogViewer(QtWidgets.QPlainTextEdit):
         # Batch update UI every 20ms
         self.timer = QtCore.QTimer(self)
         self.timer.timeout.connect(self.flush_logs)
-        self.timer.start(20)
+        self.timer.start(80)
 
     @QtCore.pyqtSlot(str)
     def append_log_safe(self, msg):

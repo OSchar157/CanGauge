@@ -38,7 +38,7 @@ def init_workers(worker: CANWorker, decoder: FrameDecoder, gauge_page: GaugePage
     worker.cur_message_updated.connect(decoder.on_raw_frame)
     worker.cur_message_updated.connect(lambda msg: log_viewer.append_log_safe(get_msg(msg)))
     decoder.frame_decoded.connect(gauge_page.on_frame)
-    decoder.frame_decoded.connect(can_stream_page.on_frame)
+    # decoder.frame_decoded.connect(can_stream_page.on_frame)
     
     worker.start()
 
@@ -61,7 +61,7 @@ if __name__ == "__main__":
         worker = init_interface()
     elif len(sys.argv) == 2 and sys.argv[1] == "test":
         worker = DemoCANWoker()
-    elif len(sys.argv) == 3 and sys.argv[1] == "test" and int(sys.argv[2]) >= 10:
+    elif len(sys.argv) == 3 and sys.argv[1] == "test" and int(sys.argv[2]) >= 100:
         worker = DemoCANWoker(int(sys.argv[2]))
     else:
         print("usage: python main.py ['test'] [100]")
