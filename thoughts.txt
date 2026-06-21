@@ -1,0 +1,1 @@
+have device wire into 12V but have option to connect to external power incase user wants to read data on startup

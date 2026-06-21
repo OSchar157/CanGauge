@@ -1,5 +1,5 @@
 from PyQt5.QtCore import QThread, pyqtSignal
-import cantools, can
+import can
 
 
 class CANWorker(QThread):
@@ -21,8 +21,6 @@ class CANWorker(QThread):
         super().__init__()
         self.bus = bus
         self.running = False
-        self.db = cantools.database.Database()
-        self.db.add_dbc_string(open('../subaru_global.dbc').read())
 
     def run(self):
         self.running = True
@@ -34,16 +32,6 @@ class CANWorker(QThread):
                 continue
 
             self.cur_message_updated.emit(msg)
-
-            try:
-                decoded = self.db.decode_message(msg.arbitration_id, msg.data)
-                if 'Engine_RPM' in decoded:
-                    self.engine_speed_updated.emit(decoded['Engine_RPM'])
-                if 'FL' in decoded:
-                    speed = (decoded['FL'] + decoded['FR'] + decoded['RL'] + decoded['RR']) / 4
-                    self.vehicle_speed_updated.emit(speed)
-            except KeyError:
-                pass  # message not in DBC, skip it
 
     def stop(self):
         self.running = False

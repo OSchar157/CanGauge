@@ -23,6 +23,12 @@ class GaugePage(QWidget):
         self.speedometer = SpeedometerWidget(min_val=0, max_val=140)
         master.addWidget(self.speedometer)
         
+    def on_frame(self, frame):
+        if 'Engine_RPM' in frame.signals:
+            self.rpm_gauge.set_value(frame.signals['Engine_RPM'])
+        elif all(k in frame.signals for k in ('FL', 'FR', 'RL', 'RR')):
+            speed = sum(frame.signals[k] for k in ('FL', 'FR', 'RL', 'RR')) / 4
+            self.speedometer.set_value(speed)
 
 if __name__ == "__main__":
     import sys

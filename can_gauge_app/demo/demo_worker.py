@@ -11,7 +11,7 @@ class DemoCANWoker(CANWorker):
     def run(self):
         self.running = True
 
-        with can.LogReader("demo/can_dump.log") as log_file:
+        with can.LogReader("demo/trunced_can_dump.log") as log_file:
             while self.running:
                 for msg in log_file:
 
@@ -19,15 +19,5 @@ class DemoCANWoker(CANWorker):
                         continue
 
                     self.cur_message_updated.emit(msg)
-
-                    try:
-                        decoded = self.db.decode_message(msg.arbitration_id, msg.data)
-                        if 'Engine_RPM' in decoded:
-                            self.engine_speed_updated.emit(decoded['Engine_RPM'])
-                        if 'FL' in decoded:
-                            speed = (decoded['FL'] + decoded['FR'] + decoded['RL'] + decoded['RR']) / 4
-                            self.vehicle_speed_updated.emit(speed)
-                    except KeyError:
-                        pass  # message not in DBC, skip it
 
                     QThread.msleep(self.speed)
