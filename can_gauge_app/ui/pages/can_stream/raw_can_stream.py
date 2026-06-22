@@ -24,8 +24,6 @@ class RawCanStream(QtWidgets.QPlainTextEdit):
         self.setMaximumBlockCount(2000)
         self.setUndoRedoEnabled(False)  # don't pay for undo history we'll never use
 
-        self.buffer = []
-
         self.setFont(_pick_mono_font(10))
         self.setStyleSheet(f"""
             QPlainTextEdit {{
@@ -34,11 +32,13 @@ class RawCanStream(QtWidgets.QPlainTextEdit):
                 border: none;
             }}
         """)
-        self.setViewportMargins(20, 20, 20, 20)
+        self.setViewportMargins(5, 5, 5, 5)
         
+        # for buffering - might not be necessary
+        self.buffer = []
         self.timer = QtCore.QTimer(self)
         self.timer.timeout.connect(self.flush_logs)
-        self.timer.start(30)
+        self.timer.start(1)
 
 
     def on_msg(self, msg: DecodedMsg):

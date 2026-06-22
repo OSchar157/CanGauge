@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ui.pages.can_stream.can_messages.can_stream_page import CanStreamPage
+from ui.pages.can_stream.new_can_messages.can_messages_page import SeenMessagesTable
 from ui.pages.can_stream.raw_can_stream import RawCanStream
 from decoding.decoder import DecodedMsg
 
@@ -19,11 +20,11 @@ class CanPage(QWidget):
         master.addLayout(left_side)
 
         self.raw_can_stream = RawCanStream()
-        self.raw_can_stream.setFixedHeight(150)
-        self.can_stream_page = CanStreamPage()
+        self.raw_can_stream.setFixedHeight(180)
+        self.can_stream_page = SeenMessagesTable()
 
-        left_side.addWidget(self.can_stream_page)
         left_side.addWidget(self.raw_can_stream)
+        left_side.addWidget(self.can_stream_page)
 
         right_side = QVBoxLayout()
         master.addLayout(right_side)

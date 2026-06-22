@@ -37,10 +37,6 @@ class CanStreamPage(QWidget):
 
         self.frame_count = 0
 
-
-        model = QStandardItemModel(0, 6)
-        model.setHorizontalHeaderLabels(["Timestamp", "Interface", "ID", "Data Len", "Name", "Data"])
-
         # ── scrollable row list ──
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)

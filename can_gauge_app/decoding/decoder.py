@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from PyQt5.QtCore import QObject, pyqtSignal
-
+from cantools.database import Database
 
 @dataclass
 class DecodedMsg:
@@ -10,13 +10,13 @@ class DecodedMsg:
     raw_hex: str
     dlc: int
     channel: str
-    signals: dict  # {signal_name: value}
+    signals: dict # {signal_name: value}
 
 
 class MsgDecoder(QObject):
     frame_decoded = pyqtSignal(DecodedMsg)
 
-    def __init__(self, db):
+    def __init__(self, db: Database):
         super().__init__()
         self.db = db  # cantools.database.Database — lives here only
 
