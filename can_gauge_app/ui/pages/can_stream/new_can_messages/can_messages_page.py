@@ -4,10 +4,13 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from decoding.decoder import DecodedMsg
+from ui.pages.can_stream.new_can_messages.create_gauge_popup import CreateGaugePopup
 
 class SeenMessagesTable(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, on_gauge_requested, parent=None):
         super().__init__(parent)
+
+        self.on_gauge_requested = on_gauge_requested
 
         layout = QVBoxLayout(self)
 
@@ -50,10 +53,20 @@ class SeenMessagesTable(QWidget):
 
         expand_layout.setAlignment(Qt.AlignLeft)
 
+        # Create Gauge Button
+        create_gauge_btn = QPushButton("Create Gauge")
+        create_gauge_btn.clicked.connect(
+            lambda checked, i=id_, n=name, s=signals: self.on_click_create_gauge_btn(i, n, s)
+        )
+        expand_layout.addWidget(create_gauge_btn)
+
         self.tree.setItemWidget(child, 0, expand_widget)
 
         return item
 
+    def on_click_create_gauge_btn(self, id_, name, signals):
+        self.popup = CreateGaugePopup(self, id_, name, signals, self.on_gauge_requested)
+        self.popup.exec()
 
     def on_msg(self, msg: DecodedMsg):
         ts = time.strftime("%H:%M:%S", time.localtime(msg.timestamp)) + f".{int(msg.timestamp % 1 * 1000):03d}"

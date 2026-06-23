@@ -3,14 +3,15 @@ import sys
 from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QApplication, QVBoxLayout
 )
+from PyQt5.QtCore import pyqtSignal
 
-from ui.pages.can_stream.can_messages.can_stream_page import CanStreamPage
+from ui.pages.can_stream.archived_can_message_pg.can_stream_page import CanStreamPage
 from ui.pages.can_stream.new_can_messages.can_messages_page import SeenMessagesTable
 from ui.pages.can_stream.raw_can_stream import RawCanStream
 from decoding.decoder import DecodedMsg
 
 class CanPage(QWidget):
-    def __init__(self):
+    def __init__(self, on_gauge_requested):
         super().__init__()
 
         master = QHBoxLayout()
@@ -21,7 +22,7 @@ class CanPage(QWidget):
 
         self.raw_can_stream = RawCanStream()
         self.raw_can_stream.setFixedHeight(180)
-        self.can_stream_page = SeenMessagesTable()
+        self.can_stream_page = SeenMessagesTable(on_gauge_requested=on_gauge_requested)
 
         left_side.addWidget(self.raw_can_stream)
         left_side.addWidget(self.can_stream_page)

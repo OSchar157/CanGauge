@@ -22,10 +22,10 @@ class Shell(QWidget):
         master.addWidget(self.pages)
 
         # wire side_menu buttons to page switching
-        self.side_menu.buttons["Live CAN Stream"].clicked.connect(lambda: self.show_page("canstream"))
+        # self.side_menu.buttons["Live CAN Stream"].clicked.connect(lambda: self.show_page("canstream"))
         self.side_menu.buttons["Gauge Display"].clicked.connect(lambda: self.show_page("gauge"))
+        self.side_menu.buttons["log viewer"].clicked.connect(lambda: self.show_page("canpage"))
         self.side_menu.buttons["Exit"].clicked.connect(QApplication.quit)
-        self.side_menu.buttons["log viewer"].clicked.connect(lambda: self.show_page("raw_can_stream"))
 
         self._page_index = {}
 

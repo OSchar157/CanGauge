@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     shell = Shell()
     gauge_page = GaugePage()
-    can_page = CanPage()
+    can_page = CanPage(on_gauge_requested=gauge_page.add_gauge)
 
     shell.add_page("gauge", gauge_page)
     shell.add_page("canpage", can_page)
@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
     init_workers(worker, decoder, gauge_page, can_page)
 
-    # shell.showFullScreen()
-    shell.setFixedSize(1080, 648)
-    shell.showNormal()
+    shell.showMaximized()
+    # shell.setFixedSize(1080, 648)
+    # shell.showNormal()
     sys.exit(app.exec_())
