@@ -16,7 +16,7 @@ class SideMenu(QWidget):
         layout.addWidget(title)
 
         self.buttons = {}
-        for label in ["Gauge Display", "Live CAN Stream", "log viewer", "Exit"]:
+        for label in ["Gauge Display", "Can Stream", "Exit"]:
             btn = QPushButton(label)
             btn.setStyleSheet("color: white; text-align: left; padding: 10px; border: none;")
             btn.setCursor(Qt.PointingHandCursor)

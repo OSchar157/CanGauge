@@ -21,10 +21,8 @@ class Shell(QWidget):
         self.pages = QStackedWidget()
         master.addWidget(self.pages)
 
-        # wire side_menu buttons to page switching
-        # self.side_menu.buttons["Live CAN Stream"].clicked.connect(lambda: self.show_page("canstream"))
         self.side_menu.buttons["Gauge Display"].clicked.connect(lambda: self.show_page("gauge"))
-        self.side_menu.buttons["log viewer"].clicked.connect(lambda: self.show_page("canpage"))
+        self.side_menu.buttons["Can Stream"].clicked.connect(lambda: self.show_page("canpage"))
         self.side_menu.buttons["Exit"].clicked.connect(QApplication.quit)
 
         self._page_index = {}

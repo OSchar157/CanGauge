@@ -7,7 +7,7 @@ from can_monitor.worker import CANWorker
 from demo.demo_worker import DemoCANWoker
 
 from ui.shell import Shell
-from ui.pages.gauge import GaugePage
+from ui.pages.gauge_page import GaugePage
 from ui.pages.can_stream.page import CanPage
 
 bitrate = 500000
@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
     init_workers(worker, decoder, gauge_page, can_page)
 
-    shell.showMaximized()
-    # shell.setFixedSize(1080, 648)
-    # shell.showNormal()
+    # shell.showMaximized()
+    shell.setFixedSize(1080, 648)
+    shell.showNormal()
     sys.exit(app.exec_())

@@ -6,38 +6,61 @@ from PyQt5.QtGui import (
     QPainter, QColor, QPen, QFont
 )
 
+from ui.gauge_widgets.gauge import Gauge, ParamSpec
 
-class SpeedometerWidget(QWidget):
+# TODO: Allow advanced customization: color schemes, arc start/end positions, number of ticks, etc
+
+
+ARC_START = 225   # degrees (Qt: counter-clockwise from 3 o'clock)
+ARC_SPAN = 270    # total sweep
+ARC_END = ARC_START - ARC_SPAN
+
+WARNING_ZONE_COLOR = "#E8A020"
+DANGER_ZONE_COLOR = "#CC2200"
+SAFE_ZONE_COLOR = "#ffffff"
+
+NUM_MAJOR_TICKS = 10
+NUM_MINOR_TICKS = 3
+
+class SimpleGauge(Gauge):
     """
-    Reusable speedometer widget.
+    Reusable gauge widget.
 
-    Parameters
-    ----------
-    min_val   : minimum value on the gauge
-    max_val   : maximum value on the gauge
+    args:
+        min_val         (float):    minimum value on the gauge
+        max_val         (float):    maximum value on the gauge
+        warn_low        (float):    value where low warning zone ends
+        warn_high        (float):    value where high warning zone begins
+        danger_low      (float):    value where low danger zone ends
+        danger_high     (float):    value where high danger zone begins
+        untit           (str):      units of the value
     """
 
+    name = "Simple Gauge"
+    
     def __init__(
         self,
         min_val=0,
-        max_val=140,
-        parent=None,
+        max_val=100,
+        warn_low=20,
+        warn_high=80,
+        danger_low=10,
+        danger_high=90,
+        unit="",
+        label="",
+        parent=None
     ):
-        super().__init__(parent)
-        self.max_val = max_val
-        self.min_val = min_val
-        self._value = min_val
-        self.unit = "MPH"
-        self.setMinimumSize(280, 280)
-
-    # ── Public API ────────────────────────────────────────────────────────────
-
-    def set_value(self, value: float):
-        self._value = max(self.min_val, min(self.max_val, value))
-        self.update()  # triggers repaint
-
-    def value(self) -> float:
-        return self._value
+        super().__init__(
+            min_val,
+            max_val,
+            warn_low,
+            warn_high,
+            danger_low,
+            danger_high,
+            unit,
+            label,
+            parent
+        )
 
     # ── Painting ──────────────────────────────────────────────────────────────
 
@@ -62,7 +85,7 @@ class SpeedometerWidget(QWidget):
         self._draw_needle(painter)
         self._draw_center_cap(painter)
 
-    def _draw_background(self, painter):
+    def _draw_background(self, painter: QPainter):
         # Outer bezel
         painter.setPen(Qt.NoPen)
         painter.setBrush(QColor("#1a1a1a"))
@@ -72,35 +95,46 @@ class SpeedometerWidget(QWidget):
         painter.setBrush(QColor("#111111"))
         painter.drawEllipse(-88, -88, 176, 176)
 
-    def _draw_arc(self, painter):
+    def _draw_arc(self, painter: QPainter):
         """Colored arc around the dial edge."""
         pen = QPen()
         pen.setWidthF(4)
         pen.setCapStyle(Qt.RoundCap)
 
-        start_angle = 225   # degrees (Qt: counter-clockwise from 3 o'clock)
-        span = 270          # total sweep
+        ang_start = ARC_START
+        ang_danger_low = ARC_START - self._value_to_angle_span(self.danger_low) if self.danger_low else ang_start
+        ang_warn_low   = ARC_START - self._value_to_angle_span(self.warn_low)   if self.warn_low   else ang_danger_low
+        
+        ang_warn_high  = ARC_START - self._value_to_angle_span(self.warn_high)  if self.warn_high  else ARC_END
+        ang_danger_high= ARC_START - self._value_to_angle_span(self.danger_high) if self.danger_high else ang_warn_high
+        ang_end   = ARC_END
 
-        pen.setColor(QColor("#ffffff"))
-        painter.setPen(pen)
-        painter.drawArc(-78, -78, 156, 156,
-                        start_angle * 16,
-                        -int(span * 16))
+        # Low Danger Zone (Red)
+        self._draw_segment(painter, pen, ang_start, ang_danger_low, DANGER_ZONE_COLOR)
+
+        # Low Warning Zone (Orange)
+        self._draw_segment(painter, pen, ang_danger_low, ang_warn_low, WARNING_ZONE_COLOR)
+
+        # Normal Zone (White)
+        self._draw_segment(painter, pen, ang_warn_low, ang_warn_high, SAFE_ZONE_COLOR)
+
+        # High Warning Zone (Orange)
+        self._draw_segment(painter, pen, ang_warn_high, ang_danger_high, WARNING_ZONE_COLOR)
+
+        # High Danger Zone (Red)
+        self._draw_segment(painter, pen, ang_danger_high, ang_end, DANGER_ZONE_COLOR)
 
     def _draw_ticks(self, painter):
-        num_major = 7
-        num_minor = 3  # minor ticks between each major
-
-        total_ticks = num_major * num_minor + num_major
-        middle_minor = (num_minor + 1) // 2  # index within group that is middle
+        total_ticks = NUM_MAJOR_TICKS * NUM_MINOR_TICKS + NUM_MAJOR_TICKS
+        middle_minor = (NUM_MINOR_TICKS + 1) // 2  # index within group that is middle
 
         for i in range(total_ticks + 1):
             frac = i / total_ticks
             angle = math.radians(225 - frac * 270)
 
-            is_major = (i % (num_minor + 1) == 0)
-            position_in_group = i % (num_minor + 1)
-            is_middle_minor = (not is_major) and (num_minor % 2 == 1) and (position_in_group == middle_minor)
+            is_major = (i % (NUM_MINOR_TICKS + 1) == 0)
+            position_in_group = i % (NUM_MINOR_TICKS + 1)
+            is_middle_minor = (not is_major) and (NUM_MINOR_TICKS % 2 == 1) and (position_in_group == middle_minor)
 
             if is_major:
                 inner_r, outer_r = 62, 76
@@ -125,12 +159,12 @@ class SpeedometerWidget(QWidget):
             painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
 
     def _draw_labels(self, painter):
-        num_major = 7
+
         font = QFont("Courier New", 7, QFont.Bold)
         painter.setFont(font)
 
-        for i in range(num_major + 1):
-            frac = i / num_major
+        for i in range(NUM_MAJOR_TICKS + 1):
+            frac = i / NUM_MAJOR_TICKS
             val = int(self.min_val + frac * (self.max_val - self.min_val))
             angle = math.radians(225 - frac * 270)
 
@@ -142,7 +176,8 @@ class SpeedometerWidget(QWidget):
 
             painter.setPen(QPen(color))
 
-            label = str(val // 1000) if self.max_val >= 1000 else str(val)
+            # label = str(val // 1000) if self.max_val >= 1000 else str(val)
+            label = str(val)
             painter.drawText(
                 QPointF(x - 5, y + 4),
                 label
@@ -195,8 +230,15 @@ class SpeedometerWidget(QWidget):
     def _value_to_angle_span(self, value) -> float:
         """Convert a value to degrees swept from the start of the arc."""
         frac = (value - self.min_val) / (self.max_val - self.min_val)
-        return frac * 270
-
+        return frac * ARC_SPAN
+    
+    def _draw_segment(self, painter, pen, start_ang, end_ang, color_hex):
+        if start_ang == end_ang:
+            return # Skip if zone doesn't exist
+        span = end_ang - start_ang # Naturally negative because it's clockwise
+        pen.setColor(QColor(color_hex))
+        painter.setPen(pen)
+        painter.drawArc(-78, -78, 156, 156, int(start_ang * 16), int(span * 16))
 
 # ── Demo window ───────────────────────────────────────────────────────────────
 
@@ -209,10 +251,7 @@ class DemoWindow(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(20, 20, 20, 20)
 
-        self.gauge = SpeedometerWidget(
-            min_val=0,
-            max_val=140
-        )
+        self.gauge = SimpleGauge()
         layout.addWidget(self.gauge)
         self.setLayout(layout)
 
@@ -221,11 +260,11 @@ class DemoWindow(QWidget):
         self._direction = 1
         timer = QTimer(self)
         timer.timeout.connect(self._animate)
-        timer.start(60)
+        timer.start(20)
 
     def _animate(self):
-        self._demo_value += 5 * self._direction
-        if self._demo_value >= 140:
+        self._demo_value += 1 * self._direction
+        if self._demo_value >= 100:
             self._direction = -1
         elif self._demo_value <= 0:
             self._direction = 1

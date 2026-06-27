@@ -30,16 +30,16 @@ class SeenMessagesTable(QWidget):
         self.tree.addTopLevelItem(item)
 
         # child item that holds the expanded custom widget area
-        child = QTreeWidgetItem(item)
-        item.addChild(child)
-        self.tree.setFirstItemColumnSpanned(child, True)  # let it span all columns
-
-        expand_widget = QWidget()
-        expand_layout = QVBoxLayout(expand_widget)
-
-        item.signal_labels = {}
-
         if signals:
+            child = QTreeWidgetItem(item)
+            item.addChild(child)
+            self.tree.setFirstItemColumnSpanned(child, True)  # let it span all columns
+
+            expand_widget = QWidget()
+            expand_layout = QVBoxLayout(expand_widget)
+
+            item.signal_labels = {}
+
             signals_form = QFormLayout()
             signals_form.setFormAlignment(Qt.AlignLeft)
 
@@ -51,21 +51,21 @@ class SeenMessagesTable(QWidget):
 
             expand_layout.addLayout(signals_form)
 
-        expand_layout.setAlignment(Qt.AlignLeft)
+            expand_layout.setAlignment(Qt.AlignLeft)
 
-        # Create Gauge Button
-        create_gauge_btn = QPushButton("Create Gauge")
-        create_gauge_btn.clicked.connect(
-            lambda checked, i=id_, n=name, s=signals: self.on_click_create_gauge_btn(i, n, s)
-        )
-        expand_layout.addWidget(create_gauge_btn)
+            # Create Gauge Button
+            create_gauge_btn = QPushButton("Create Gauge")
+            create_gauge_btn.clicked.connect(
+                lambda checked, n=name, s=signals: self.on_click_create_gauge_btn(n, s)
+            )
+            expand_layout.addWidget(create_gauge_btn)
 
-        self.tree.setItemWidget(child, 0, expand_widget)
+            self.tree.setItemWidget(child, 0, expand_widget)
 
         return item
 
-    def on_click_create_gauge_btn(self, id_, name, signals):
-        self.popup = CreateGaugePopup(self, id_, name, signals, self.on_gauge_requested)
+    def on_click_create_gauge_btn(self, name, signals):
+        self.popup = CreateGaugePopup(self, name, signals, self.on_gauge_requested)
         self.popup.exec()
 
     def on_msg(self, msg: DecodedMsg):

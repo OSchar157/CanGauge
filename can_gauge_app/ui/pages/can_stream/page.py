@@ -1,11 +1,9 @@
 import sys
 
 from PyQt5.QtWidgets import (
-    QWidget, QHBoxLayout, QApplication, QVBoxLayout
+    QWidget, QHBoxLayout, QVBoxLayout
 )
-from PyQt5.QtCore import pyqtSignal
 
-from ui.pages.can_stream.archived_can_message_pg.can_stream_page import CanStreamPage
 from ui.pages.can_stream.new_can_messages.can_messages_page import SeenMessagesTable
 from ui.pages.can_stream.raw_can_stream import RawCanStream
 from decoding.decoder import DecodedMsg

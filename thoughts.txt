@@ -1,3 +1,8 @@
 have device wire into 12V but have option to connect to external power incase user wants to read data on startup
 could make demo more exact by getting timestamp of next line, getting dif btw current line timestamp and then setitng that to the sleep atribute
     totally not necessary but might be fun to implement
+
+
+TODO:
+finish function area in create a guage
+save gauges when app closes
