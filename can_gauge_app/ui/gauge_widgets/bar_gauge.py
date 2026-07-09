@@ -52,6 +52,8 @@ class BarGauge(Gauge):
                         warn_high, danger_low, danger_high,
                         unit, label, parent)
 
+    def to_json(self):
+        return super().to_json()
     # ── Painting ──────────────────────────────────────────────────────────────
 
     def paintEvent(self, event):

@@ -4,9 +4,9 @@ from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout
 )
 
-from ui.pages.can_stream.new_can_messages.can_messages_page import SeenMessagesTable
-from ui.pages.can_stream.raw_can_stream import RawCanStream
-from decoding.decoder import DecodedMsg
+from can_gauge_app.ui.pages.can_table.can_table import SeenMessagesTable
+from can_gauge_app.ui.pages.can_stream.can_stream import RawCanStream
+from can_worker.worker import DecodedMsg
 
 class CanPage(QWidget):
     def __init__(self, on_gauge_requested):
@@ -28,6 +28,6 @@ class CanPage(QWidget):
         right_side = QVBoxLayout()
         master.addLayout(right_side)
     
-    def on_msg(self, msg: DecodedMsg):
-        self.can_stream_page.on_msg(msg)
-        self.raw_can_stream.on_msg(msg)
+    def on_msgs(self, msgs: list[DecodedMsg]):
+        self.can_stream_page.on_msgs(msgs)
+        self.raw_can_stream.on_msgs(msgs)

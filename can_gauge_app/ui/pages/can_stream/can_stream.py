@@ -1,9 +1,10 @@
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QVBoxLayout
+from PyQt5.QtCore import Qt
 import time
 
 
-from decoding.decoder import DecodedMsg
+from can_worker.worker import DecodedMsg
 
 MONO = "Consolas"  # or "JetBrains Mono", "Cascadia Code", whatever you've got
 
@@ -17,12 +18,14 @@ NAME_COLOR = "#ff6583"
 DATA_COLOR = "#d4d4d4"
 
 
-class RawCanStream(QtWidgets.QPlainTextEdit):
+class CanStream(QtWidgets.QPlainTextEdit):
     def __init__(self):
         super().__init__()
         self.setReadOnly(True)
         self.setMaximumBlockCount(2000)
-        self.setUndoRedoEnabled(False)  # don't pay for undo history we'll never use
+        self.setUndoRedoEnabled(False)
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        self.viewport().setCursor(Qt.CursorShape.ArrowCursor)
 
         self.setFont(_pick_mono_font(10))
         self.setStyleSheet(f"""
@@ -33,50 +36,40 @@ class RawCanStream(QtWidgets.QPlainTextEdit):
             }}
         """)
         self.setViewportMargins(5, 5, 5, 5)
-        
-        # for buffering - might not be necessary
-        self.buffer = []
-        self.timer = QtCore.QTimer(self)
-        self.timer.timeout.connect(self.flush_logs)
-        self.timer.start(1)
 
-
-    def on_msg(self, msg: DecodedMsg):
+    def on_msgs(self, msgs: list[DecodedMsg]):
         """Worker calls this via signal. Thread-safe."""
-        ts = time.strftime("%H:%M:%S", time.localtime(msg.timestamp)) + f".{int(msg.timestamp % 1 * 1000):03d}"
-        channel = msg.channel
-        can_id = f"{msg.can_id:03X}"
-        dlc_str = f"[{msg.dlc}]"
-        name = (msg.name or "").replace("_", " ")
-        data = msg.raw_hex
-
-        line = (
-            f'<span style="color:{TS_COLOR}">{ts}</span>&nbsp;&nbsp;&nbsp;'
-            f'<span style="color:{CHANNEL_COLOR}">{_pad_html(channel, 8)}</span>'
-            f'<span style="color:{ID_COLOR}">{can_id:>3}</span>&nbsp;&nbsp;'
-            f'<span style="color:{DLC_COLOR}">{_pad_html(dlc_str, 6)}</span>'
-            f'<span style="color:{NAME_COLOR}">{_pad_html(name, 24)}</span>'
-            f'<span style="color:{DATA_COLOR}">{data}</span>'
-        )
-
-        self.buffer.append(line)
-
-    def flush_logs(self):
-        if not self.buffer:
-            return
 
         sb = self.verticalScrollBar()
         was_at_bottom = sb.value() >= sb.maximum() - 4  # only autoscroll if user is already at bottom
-
+        
         self.setUpdatesEnabled(False)
-        # appendHtml per-line keeps each frame as its own block (needed for maximumBlockCount to trim correctly)
-        for line in self.buffer:
-            self.appendHtml(line)
-        self.buffer.clear()
-        self.setUpdatesEnabled(True)
+
+        lines = []
+        for msg in msgs:
+            ts = time.strftime("%H:%M:%S", time.localtime(msg.timestamp)) + f".{int(msg.timestamp % 1 * 1000):03d}"
+            channel = msg.channel
+            can_id = f"{msg.can_id:03X}"
+            dlc_str = f"[{msg.dlc}]"
+            name = (msg.name or "").replace("_", " ")
+            data = msg.raw_hex
+
+            line = (
+                f'<span style="color:{TS_COLOR}">{ts}</span>&nbsp;&nbsp;&nbsp;'
+                f'<span style="color:{CHANNEL_COLOR}">{_pad_html(channel, 8)}</span>'
+                f'<span style="color:{ID_COLOR}">{can_id:>3}</span>&nbsp;&nbsp;'
+                f'<span style="color:{DLC_COLOR}">{_pad_html(dlc_str, 6)}</span>'
+                f'<span style="color:{NAME_COLOR}">{_pad_html(name, 24)}</span>'
+                f'<span style="color:{DATA_COLOR}">{data}</span>'
+            )
+            lines.append(line)
+
+        self.appendHtml("<br>".join(lines))
 
         if was_at_bottom:
             sb.setValue(sb.maximum())
+
+        self.setUpdatesEnabled(True)
 
 def _pad_html(text: str, width: int) -> str:
     """Pad with non-breaking spaces so HTML rendering doesn't collapse it."""

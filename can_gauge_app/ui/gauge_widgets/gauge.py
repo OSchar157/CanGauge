@@ -1,11 +1,9 @@
-import sys
-import math
 from typing import Any
-from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QVBoxLayout, QLabel
-from PyQt5.QtCore import Qt, QTimer, QRectF
-from PyQt5.QtGui import QPainter, QColor, QPen, QFont, QLinearGradient
+from PyQt5.QtWidgets import QWidget
 from dataclasses import dataclass, field
-from typing import Any, Type
+from typing import Any
+
+import inspect, json
 
 @dataclass
 class ParamSpec:
@@ -44,6 +42,7 @@ class Gauge(QWidget):
         self.unit = unit
         self.label = label
         self._value = min_val
+        self._id = None
 
     def set_value(self, value: float):
         self._value = max(self.min_val, min(self.max_val, value))
@@ -51,3 +50,13 @@ class Gauge(QWidget):
 
     def value(self) -> float:
         return self._value
+    
+    def to_json(self):
+        sig = inspect.signature(self.__class__.__init__)
+        data = {"type": self.__class__.__name__}
+        for name, param in sig.parameters.items():
+            if name in ("self", "parent"):
+                continue
+            data[name] = getattr(self, name)
+        data["id"] = self._id
+        return data

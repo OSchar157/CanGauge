@@ -17,7 +17,7 @@ class Speedometer(SimpleGauge):
             if f.name == "warn_high": f.default = None
             if f.name == "danger_high": f.default = None
             if f.name == "max_val": f.default = 140
-            if f.name == "unit": f.default = "KPH"
+            if f.name == "unit": f.default = "MPH"
             if f.name == "label":   f.default = "Speedometer"
         return fields
 
@@ -25,6 +25,10 @@ class Speedometer(SimpleGauge):
                  danger_low=None, danger_high=None, unit="KPH", label="", parent=None):
         super().__init__(min_val, max_val, warn_low, warn_high, danger_low, 
                          danger_high, unit, label, parent)
+    
+    def set_value(self, value: float):
+        self._value = max(self.min_val, min(self.max_val, value * 0.621371))
+        self.update()
 
 class EngineSpeedGauge(SimpleGauge):
     name = "Engine Speed Gauge"

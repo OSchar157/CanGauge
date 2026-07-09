@@ -62,6 +62,9 @@ class SimpleGauge(Gauge):
             parent
         )
 
+    def to_json(self):
+        return super().to_json()
+
     # ── Painting ──────────────────────────────────────────────────────────────
 
     def paintEvent(self, event):

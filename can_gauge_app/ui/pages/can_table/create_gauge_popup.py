@@ -4,9 +4,7 @@ from PyQt5.QtWidgets import (
     QLineEdit, QComboBox, QPushButton, QLabel, QDialog,
     QHBoxLayout, QBoxLayout
 )
-
 from PyQt5.QtCore import Qt, QTimer
-
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
 from ui.gauge_widgets import GAUGE_TYPES
 
@@ -16,8 +14,8 @@ class CreateGaugePopup(QDialog):
 
         self.on_gauge_requested = on_gauge_requested
 
-        self.setWindowTitle("Custom Pop-up")
-        self.resize(600, 600)
+        self.setWindowTitle("Create A Gauge")
+        # self.resize(600, 600)
         
         layout = QVBoxLayout()
         layout.addWidget(QLabel(f"Gauge Creation for: {name}"))
@@ -44,7 +42,7 @@ class CreateGaugePopup(QDialog):
 
         # Gauge params
         self.gauge_params_layout = QVBoxLayout()
-        self.gauge_params_inputs = {}
+        self.gauge_params_inputs: dict[str, QLabel] = {}
         self._populate_gauge_params()
         layout.addLayout(self.gauge_params_layout)
 
@@ -62,11 +60,12 @@ class CreateGaugePopup(QDialog):
 
     def _on_gauge_selected(self, text):
         self.selected_gauge_type = GAUGE_TYPES[text]
-        self.gauge_params_inputs: dict[str, QLabel] = {}
+        self.gauge_params_inputs.clear()
         self._populate_gauge_params()
 
     def _populate_gauge_params(self):
-        clear_layout(self.gauge_params_layout)
+        self._clear_gauge_params_layout()
+
         for field in self.selected_gauge_type.get_fields():
             row = QHBoxLayout()
             edit = QLineEdit()
@@ -91,15 +90,23 @@ class CreateGaugePopup(QDialog):
             for (key, value_box), spec in zip(self.gauge_params_inputs.items(), self.selected_gauge_type.get_fields())
         }
 
-        self.on_gauge_requested(self.selected_gauge_type, self.singal_sel_dropdown.dropdown.currentText()[1:-1], args)
+        self.on_gauge_requested(self.selected_gauge_type, self.singal_sel_dropdown.currentText(), args)
         self.close()
 
-def clear_layout(layout: QBoxLayout):
-    while layout.count():
-        item = layout.takeAt(0)
-        widget = item.widget()
-        if widget:
-            widget.deleteLater()   
+    def _clear_gauge_params_layout(self):
+        while self.gauge_params_layout.count():
+            item = self.gauge_params_layout.takeAt(0)
+            layout = item.layout()
+            if layout:
+                # clear widgets inside the row layout
+                while layout.count():
+                    child = layout.takeAt(0) 
+                    widget = child.widget()
+                    if widget:
+                        widget.setParent(None)
+                # then delete the row layout itself
+                layout.deleteLater()
+
 
 def cast(spec, raw):
     if spec.type != str and raw == "":
