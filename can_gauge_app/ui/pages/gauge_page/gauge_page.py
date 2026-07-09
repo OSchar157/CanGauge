@@ -98,25 +98,20 @@ class RemoveGaugeBtn(QPushButton):
         self.clicked.connect(self.rm_layout)
 
     def rm_layout(self):
-        # Remove and delete every widget/item from the layout
         while self.layout.count():
             item = self.layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
                 widget.setParent(None)
                 widget.deleteLater()
-            else:
-                # handle nested layouts if any
-                sub_layout = item.layout()
-                if sub_layout is not None:
-                    self._clear_layout(sub_layout)
 
-        # remove the gauge from the dict
+        self.parent.gauges_layout.removeItem(self.layout)
+        self.layout.deleteLater()
+
         for gauges in self.parent.gauges.values():
-            for gauge in gauges:
-                if gauge._id == self.gauge._id:
-                    gauges.remove(gauge)
-                    break
+            if self.gauge in gauges:
+                gauges.remove(self.gauge)
+                break
 
     def _clear_layout(self, layout):
         while layout.count():

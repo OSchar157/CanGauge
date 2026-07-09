@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QWidget, QVBoxLayout,
-    QPushButton, QLabel, QFormLayout
+    QPushButton, QLabel, QFormLayout, QHeaderView
 )
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from can_worker.worker import DecodedMsg
 from ui.pages.can_table.create_gauge_popup import CreateGaugePopup
 from collections import defaultdict
@@ -26,7 +26,33 @@ class CanTable(QWidget):
 
         self.tree.collapseAll()  # start collapsed
 
-        self._ids_seen: defaultdict[int, dict] = defaultdict(dict)
+        self._ids_seen = {}   # can_id -> {"data": DecodedMsg, "widget": QTreeWidgetItem}
+        self._pending = {}    # can_id -> newest DecodedMsg since last flush
+    
+        self._ui_timer = QTimer(self)
+        self._ui_timer.setInterval(50)      # 20 fps; bump to 100 ms if you want
+        self._ui_timer.timeout.connect(self._flush_pending)
+        self._ui_timer.start()
+    
+        self.tree.itemExpanded.connect(self._on_item_expanded)
+    
+        # 1) Sorting is OFF permanently while streaming. We only sort when the
+        #    user clicks a header (and when a brand-new id appears, to keep
+        #    their chosen order valid -- rare after startup).
+        self._sort_column = -1
+        self._sort_order = Qt.AscendingOrder
+        self.tree.setSortingEnabled(False)
+        header = self.tree.header()
+        header.setSectionsClickable(True)
+        header.setSortIndicatorShown(True)
+        header.sectionClicked.connect(self._on_header_clicked)
+    
+        # 2) If any column used ResizeToContents, every setText forced the header
+        #    to re-measure that column across all rows. Interactive + a one-time
+        #    measure at startup avoids that entirely.
+        header.setSectionResizeMode(QHeaderView.Interactive)
+        for col in range(self.tree.columnCount()):
+            self.tree.resizeColumnToContents(col)
 
     def add_row(self, timestamp: str, interface: str, id_: str, data_len: str, name: str, data: str, signals: dict):
         can_id = f"{id_:03X}"
@@ -79,38 +105,81 @@ class CanTable(QWidget):
     def on_click_decode_btn(self, id_, data):
         print("I ain't do this shit yet")
 
-    def on_msgs(self, msgs: list[DecodedMsg]):
-
-        self.setUpdatesEnabled(False)
-        self.tree.setSortingEnabled(False)
-
+    # --- ingest: called for every incoming batch, does NO UI work ---------------
+    def _on_header_clicked(self, col):
+        if col == self._sort_column:
+            self._sort_order = (
+                Qt.DescendingOrder
+                if self._sort_order == Qt.AscendingOrder
+                else Qt.AscendingOrder
+            )
+        else:
+            self._sort_column = col
+            self._sort_order = Qt.AscendingOrder
+        self.tree.sortItems(col, self._sort_order)
+        self.tree.header().setSortIndicator(col, self._sort_order)
+    
+    
+    # --- ingest -------------------------------------------------------------------
+    def on_msgs(self, msgs):
         for msg in msgs:
-            ts = format_time(msg.timestamp)
-            channel = msg.channel
-            dlc_str = f"[{msg.dlc}]"
-            name = (msg.name or "").replace("_", " ")
-            data = msg.raw_hex
-            signals = msg.signals
-        
-            if msg.can_id in self._ids_seen.keys():
-                self._ids_seen[msg.can_id]["data"] = msg
-                # update pre-existing row elem, not all should change
-                item = self._ids_seen[msg.can_id]["widget"]
-                item.setText(0, ts)        # Timestamp
-                item.setText(3, dlc_str)   # Data Len
-                item.setText(5, data)      # Data
-
-                for sig_name, value in signals.items():
-                    if sig_name in item.signal_labels:
-                        item.signal_labels[sig_name].setText(format_signal_value(value))
+            self._pending[msg.can_id] = msg   # coalesce: newest per id wins
+    
+    
+    # --- render (at most 20x/sec) ---------------------------------------------
+    def _flush_pending(self):
+        if not self._pending:
+            return
+        pending, self._pending = self._pending, {}
+    
+        # No setUpdatesEnabled / setSortingEnabled toggling anymore. With ~50
+        # rows, letting Qt repaint just the changed cells is cheaper than
+        # forcing a full-tree repaint every flush.
+        new_rows = False
+        for can_id, msg in pending.items():
+            entry = self._ids_seen.get(can_id)
+            if entry is None:
+                item = self.add_row(
+                    format_time(msg.timestamp),
+                    msg.channel,
+                    can_id,
+                    f"[{msg.dlc}]",
+                    (msg.name or "").replace("_", " "),
+                    msg.raw_hex,
+                    msg.signals,
+                )
+                item.can_id = can_id
+                self._ids_seen[can_id] = {"data": msg, "widget": item}
+                new_rows = True
             else:
-                self._ids_seen[msg.can_id]["data"] = msg
-                item = self.add_row(ts, channel, msg.can_id, dlc_str, name, data, signals)
-                self._ids_seen[msg.can_id]["widget"] = item
-        
-        self.tree.setSortingEnabled(True)
-        self.setUpdatesEnabled(True)
-
+                entry["data"] = msg
+                item = entry["widget"]
+                item.setText(0, format_time(msg.timestamp))
+                item.setText(3, f"[{msg.dlc}]")
+                item.setText(5, msg.raw_hex)
+                if item.isExpanded():
+                    self._refresh_signal_labels(item, msg.signals)
+    
+        # Keep the user's chosen sort valid when a new id shows up.
+        if new_rows and self._sort_column >= 0:
+            self.tree.sortItems(self._sort_column, self._sort_order)
+    
+    
+    def _refresh_signal_labels(self, item, signals):
+        labels = getattr(item, "signal_labels", None)
+        if not labels:
+            return
+        for sig_name, value in signals.items():
+            label = labels.get(sig_name)
+            if label is not None:
+                label.setText(format_signal_value(value))
+    
+    
+    def _on_item_expanded(self, item):
+        entry = self._ids_seen.get(getattr(item, "can_id", None))
+        if entry is not None:
+            self._refresh_signal_labels(item, entry["data"].signals)
+    
 import time
 def format_time(timestamp):
     return time.strftime("%H:%M:%S", time.localtime(timestamp or time.time())) + f".{int((timestamp or 0) % 1 * 1000):03d}"
