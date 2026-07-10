@@ -27,7 +27,8 @@ class CanStream(QtWidgets.QPlainTextEdit):
         self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         self.viewport().setCursor(Qt.CursorShape.ArrowCursor)
 
-        self.setFont(_pick_mono_font(10))
+        self.setFont(QtGui.QFont("Courier New", 19))
+        # self.setFont(_pick_mono_font(10))
         self.setStyleSheet(f"""
             QPlainTextEdit {{
                 background-color: {BG};
@@ -38,10 +39,9 @@ class CanStream(QtWidgets.QPlainTextEdit):
         self.setViewportMargins(5, 5, 5, 5)
 
     def on_msgs(self, msgs: list[DecodedMsg]):
-        """Worker calls this via signal. Thread-safe."""
 
-        sb = self.verticalScrollBar()
-        was_at_bottom = sb.value() >= sb.maximum() - 4  # only autoscroll if user is already at bottom
+        scroll_bar = self.verticalScrollBar()
+        was_at_bottom = scroll_bar.value() >= scroll_bar.maximum() - 4
         
         self.setUpdatesEnabled(False)
 
@@ -50,7 +50,7 @@ class CanStream(QtWidgets.QPlainTextEdit):
             ts = time.strftime("%H:%M:%S", time.localtime(msg.timestamp)) + f".{int(msg.timestamp % 1 * 1000):03d}"
             channel = msg.channel
             can_id = f"{msg.can_id:03X}"
-            dlc_str = f"[{msg.dlc}]"
+            dlc_str = f"[{msg.data_len}]"
             name = (msg.name or "").replace("_", " ")
             data = msg.raw_hex
 
@@ -67,7 +67,7 @@ class CanStream(QtWidgets.QPlainTextEdit):
         self.appendHtml("<br>".join(lines))
 
         if was_at_bottom:
-            sb.setValue(sb.maximum())
+            scroll_bar.setValue(scroll_bar.maximum())
 
         self.setUpdatesEnabled(True)
 
@@ -84,6 +84,7 @@ def _pick_mono_font(point_size: int=10) -> QtGui.QFont:
     families = set(QtGui.QFontDatabase().families())
     for name in candidates:
         if name in families:
+            print(name)
             return QtGui.QFont(name, point_size)
     # last resort: ask Qt for *any* monospace font on the system
     font = QtGui.QFont()

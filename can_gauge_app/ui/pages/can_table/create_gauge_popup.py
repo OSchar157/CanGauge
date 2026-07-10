@@ -15,7 +15,6 @@ class CreateGaugePopup(QDialog):
         self.on_gauge_requested = on_gauge_requested
 
         self.setWindowTitle("Create A Gauge")
-        # self.resize(600, 600)
         
         layout = QVBoxLayout()
         layout.addWidget(QLabel(f"Gauge Creation for: {name}"))

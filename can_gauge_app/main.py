@@ -59,7 +59,7 @@ if __name__ == "__main__":
     
     worker.start()
 
-    # shell.showMaximized()
-    shell.setFixedSize(1024, 600)
-    shell.showNormal()
+    shell.showMaximized()
+    # shell.setFixedSize(1024, 600)
+    # shell.showNormal()
     sys.exit(app.exec_())

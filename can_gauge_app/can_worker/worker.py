@@ -12,11 +12,12 @@ class DecodedMsg:
     name: str | None
     timestamp: float
     raw_hex: str
-    dlc: int
+    data_len: int
     channel: str
     signals: dict
+    is_extended: bool
 
-EMIT_FREQUENCY = 30
+EMIT_FREQUENCY_HZ = 30
 
 class CANWorker(QThread):
     decoded_msg_buffer_emitter = pyqtSignal(list)
@@ -32,23 +33,23 @@ class CANWorker(QThread):
     def run(self):
         self.running = True
         
-        last_emit = time.monotonic()
-        interval = 1.0 / EMIT_FREQUENCY
+        last_buffer_emit = time.monotonic()
+        emit_interval = 1.0 / EMIT_FREQUENCY_HZ
 
         while self.running:
-            msg = self.bus.recv(timeout=0.1)
-            if msg is not None:
-                self._decode_msg(msg)
+            can_msg = self.bus.recv(timeout=0.1)
+            if can_msg is not None:
+                self._decode_and_buffer(can_msg)
 
             now = time.monotonic()
-            if now - last_emit >= interval:
+            if now - last_buffer_emit >= emit_interval:
                 self._emit_buffer()
-                last_emit = now
+                last_buffer_emit = now
 
-    def _decode_msg(self, msg):
+    def _decode_and_buffer(self, msg:can.Message):
         try:
-            msg_def = self.db.get_message_by_frame_id(msg.arbitration_id)
-            name = msg_def.name
+            dbc_msg = self.db.get_message_by_frame_id(msg.arbitration_id)
+            name = dbc_msg.name
             signals = self.db.decode_message(msg.arbitration_id, msg.data)
         except Exception:
             name = None
@@ -58,10 +59,11 @@ class CANWorker(QThread):
             can_id=msg.arbitration_id,
             name=name,
             timestamp=msg.timestamp,
-            raw_hex=" ".join(f"{b:02X}" for b in msg.data),
-            dlc=msg.dlc,
+            raw_hex=" ".join(f"{byte:02X}" for byte in msg.data),
+            data_len=msg.dlc,
             channel=msg.channel,
             signals=signals,
+            is_extended=msg.is_extended_id
         )
 
         self.decoded_msg_buffer.append(decoded)

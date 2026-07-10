@@ -6,6 +6,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from can_worker.worker import DecodedMsg
 from ui.pages.can_table.create_gauge_popup import CreateGaugePopup
 from collections import defaultdict
+from ui.pages.can_table.decode_id_popup import DecodeIdPopup
 
 class CanTable(QWidget):
     data_updated = pyqtSignal()
@@ -54,7 +55,7 @@ class CanTable(QWidget):
         for col in range(self.tree.columnCount()):
             self.tree.resizeColumnToContents(col)
 
-    def add_row(self, timestamp: str, interface: str, id_: str, data_len: str, name: str, data: str, signals: dict):
+    def add_row(self, timestamp: str, interface: str, id_: str, data_len: str, name: str, data: str, signals: dict, is_extended: bool):
         can_id = f"{id_:03X}"
         item = QTreeWidgetItem([timestamp, interface, can_id, data_len, name, data])
         self.tree.addTopLevelItem(item)
@@ -91,7 +92,7 @@ class CanTable(QWidget):
             expand_layout.addWidget(create_gauge_btn)
         else:
             decode_btn = QPushButton("Decode")
-            # decode_btn.clicked.connect(lambda checked, i=id_: self.on_click_decode_btn(i, self._ids_seen))
+            decode_btn.clicked.connect(lambda checked, i=can_id, d=data_len, e=is_extended: self.on_click_decode_btn(i, d, e))
             expand_layout.addWidget(decode_btn)
 
         self.tree.setItemWidget(child, 0, expand_widget)
@@ -102,8 +103,9 @@ class CanTable(QWidget):
         self.gauge_creation_popup = CreateGaugePopup(self, name, signals, self.on_gauge_requested)
         self.gauge_creation_popup.exec()
 
-    def on_click_decode_btn(self, id_, data):
-        print("I ain't do this shit yet")
+    def on_click_decode_btn(self, can_id, data_len, is_extended):
+        self.decode_id_popup = DecodeIdPopup(can_id, data_len, is_extended, parent=self)
+        self.decode_id_popup.exec()
 
     # --- ingest: called for every incoming batch, does NO UI work ---------------
     def _on_header_clicked(self, col):
@@ -119,12 +121,10 @@ class CanTable(QWidget):
         self.tree.sortItems(col, self._sort_order)
         self.tree.header().setSortIndicator(col, self._sort_order)
     
-    
     # --- ingest -------------------------------------------------------------------
     def on_msgs(self, msgs):
         for msg in msgs:
             self._pending[msg.can_id] = msg   # coalesce: newest per id wins
-    
     
     # --- render (at most 20x/sec) ---------------------------------------------
     def _flush_pending(self):
@@ -143,10 +143,11 @@ class CanTable(QWidget):
                     format_time(msg.timestamp),
                     msg.channel,
                     can_id,
-                    f"[{msg.dlc}]",
+                    f"[{msg.data_len}]",
                     (msg.name or "").replace("_", " "),
                     msg.raw_hex,
                     msg.signals,
+                    msg.is_extended
                 )
                 item.can_id = can_id
                 self._ids_seen[can_id] = {"data": msg, "widget": item}
@@ -155,7 +156,7 @@ class CanTable(QWidget):
                 entry["data"] = msg
                 item = entry["widget"]
                 item.setText(0, format_time(msg.timestamp))
-                item.setText(3, f"[{msg.dlc}]")
+                item.setText(3, f"[{msg.data_len}]")
                 item.setText(5, msg.raw_hex)
                 if item.isExpanded():
                     self._refresh_signal_labels(item, msg.signals)
@@ -174,7 +175,6 @@ class CanTable(QWidget):
             if label is not None:
                 label.setText(format_signal_value(value))
     
-    
     def _on_item_expanded(self, item):
         entry = self._ids_seen.get(getattr(item, "can_id", None))
         if entry is not None:
@@ -190,15 +190,3 @@ def format_signal_value(value):
     if hasattr(value, "name"):
         return str(value.name)
     return str(value)
-
-if __name__ == "__main__":
-    import sys
-    from PyQt5.QtWidgets import QApplication
-
-    app = QApplication(sys.argv)
-
-    page = SeenMessagesTable()
-    page.resize(700, 400)
-    page.show()
-
-    sys.exit(app.exec_())

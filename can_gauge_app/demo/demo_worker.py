@@ -24,7 +24,7 @@ class DemoCANWoker(CANWorker):
                     if msg is None:
                         continue
 
-                    self._decode_msg(msg)
+                    self._decode_and_buffer(msg)
 
                     now = time.monotonic()
                     if now - last_emit >= interval:
