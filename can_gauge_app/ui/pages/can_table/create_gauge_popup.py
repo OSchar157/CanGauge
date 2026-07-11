@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QGridLayout,
     QLineEdit, QComboBox, QPushButton, QLabel, QDialog,
-    QHBoxLayout, QBoxLayout
+    QHBoxLayout, QBoxLayout, QScrollArea
 )
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
@@ -65,6 +65,12 @@ class CreateGaugePopup(QDialog):
     def _populate_gauge_params(self):
         self._clear_gauge_params_layout()
 
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
+        content_widget = QWidget()
+        gauge_params_layout = QVBoxLayout(content_widget)
+
         for field in self.selected_gauge_type.get_fields():
             row = QHBoxLayout()
             edit = QLineEdit()
@@ -81,7 +87,11 @@ class CreateGaugePopup(QDialog):
 
             self.gauge_params_inputs[field.name] = edit
 
-            self.gauge_params_layout.addLayout(row)
+            gauge_params_layout.addLayout(row)
+        
+        scroll_area.setWidget(content_widget)
+
+        self.gauge_params_layout.addWidget(scroll_area)
 
     def _on_add_gauge(self):
         args = {

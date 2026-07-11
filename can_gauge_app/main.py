@@ -15,6 +15,7 @@ using_can0 = True
 
 def init_interface(db) -> CANWorker:
     bus_name = f"{'can0' if using_can0 else 'can1'}"
+    print(id(db))
 
     os.system(f'sudo ifconfig {bus_name} down')
     os.system(f'sudo ip link set {bus_name} type can bitrate {bitrate}')
@@ -30,9 +31,12 @@ if __name__ == "__main__":
     app.setApplicationName("CanGauge") 
     app.setDesktopFileName("CanGauge")
 
+    db = cantools.database.Database()
+    db.add_dbc_string(open('../subaru_global_TESTING.dbc').read())
+    
     shell = Shell()
     gauge_page = GaugePage()
-    can_table = CanTable(on_gauge_requested=gauge_page.add_gauge)
+    can_table = CanTable(on_gauge_requested=gauge_page.add_gauge, db=db)
     can_stream = CanStream()
 
     shell.add_page("gauge", gauge_page)
@@ -40,8 +44,6 @@ if __name__ == "__main__":
     shell.add_page("canstream", can_stream)
     shell.show_page("cantable")
 
-    db = cantools.database.Database()
-    db.add_dbc_string(open('../subaru_global.dbc').read())
 
     if len(sys.argv) == 1:
         worker = init_interface(db)

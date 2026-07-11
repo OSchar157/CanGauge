@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QWidget, QVBoxLayout,
-    QPushButton, QLabel, QFormLayout, QHeaderView
+    QPushButton, QLabel, QFormLayout, QHeaderView,
+    QDialog
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from can_worker.worker import DecodedMsg
@@ -8,13 +9,22 @@ from ui.pages.can_table.create_gauge_popup import CreateGaugePopup
 from collections import defaultdict
 from ui.pages.can_table.decode_id_popup import DecodeIdPopup
 
+from cantools.database import Database
+
 class CanTable(QWidget):
     data_updated = pyqtSignal()
 
-    def __init__(self, on_gauge_requested, parent=None):
+    def __init__(self, on_gauge_requested, db: Database, parent=None):
         super().__init__(parent)
 
         self.on_gauge_requested = on_gauge_requested
+        self.db = db
+
+        self._build_ui()
+
+    def _build_ui(self):
+        if self.layout() is not None:
+            QWidget().setLayout(self.layout())
 
         layout = QVBoxLayout(self)
 
@@ -92,7 +102,7 @@ class CanTable(QWidget):
             expand_layout.addWidget(create_gauge_btn)
         else:
             decode_btn = QPushButton("Decode")
-            decode_btn.clicked.connect(lambda checked, i=can_id, d=data_len, e=is_extended: self.on_click_decode_btn(i, d, e))
+            decode_btn.clicked.connect(lambda checked, i=can_id, d=data_len[1:-1], e=is_extended, db=self.db: self.on_click_decode_btn(i, d, e, db))
             expand_layout.addWidget(decode_btn)
 
         self.tree.setItemWidget(child, 0, expand_widget)
@@ -103,9 +113,10 @@ class CanTable(QWidget):
         self.gauge_creation_popup = CreateGaugePopup(self, name, signals, self.on_gauge_requested)
         self.gauge_creation_popup.exec()
 
-    def on_click_decode_btn(self, can_id, data_len, is_extended):
-        self.decode_id_popup = DecodeIdPopup(can_id, data_len, is_extended, parent=self)
-        self.decode_id_popup.exec()
+    def on_click_decode_btn(self, can_id, data_len, is_extended, db):
+        self.decode_id_popup = DecodeIdPopup(can_id, data_len, is_extended, db, parent=self)
+        if self.decode_id_popup.exec_() == QDialog.Accepted:
+            self._build_ui()
 
     # --- ingest: called for every incoming batch, does NO UI work ---------------
     def _on_header_clicked(self, col):
@@ -147,7 +158,7 @@ class CanTable(QWidget):
                     (msg.name or "").replace("_", " "),
                     msg.raw_hex,
                     msg.signals,
-                    msg.is_extended
+                    msg.is_extended,
                 )
                 item.can_id = can_id
                 self._ids_seen[can_id] = {"data": msg, "widget": item}

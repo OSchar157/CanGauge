@@ -51,7 +51,7 @@ class CANWorker(QThread):
             dbc_msg = self.db.get_message_by_frame_id(msg.arbitration_id)
             name = dbc_msg.name
             signals = self.db.decode_message(msg.arbitration_id, msg.data)
-        except Exception:
+        except:
             name = None
             signals = {}
 
