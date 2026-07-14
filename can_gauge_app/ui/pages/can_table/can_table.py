@@ -12,7 +12,7 @@ from ui.pages.can_table.decode_id_popup import DecodeIdPopup
 from cantools.database import Database
 
 class CanTable(QWidget):
-    data_updated = pyqtSignal()
+    new_frame = pyqtSignal(object)
 
     def __init__(self, on_gauge_requested, db: Database, parent=None):
         super().__init__(parent)
@@ -115,7 +115,11 @@ class CanTable(QWidget):
 
     def on_click_decode_btn(self, can_id, data_len, is_extended, db):
         self.decode_id_popup = DecodeIdPopup(can_id, data_len, is_extended, db, parent=self)
+        self.new_frame.connect(self.decode_id_popup.on_new_frame)
+
         if self.decode_id_popup.exec_() == QDialog.Accepted:
+            self.new_frame.disconnect(self.decode_id_popup.on_new_frame)
+            self.decode_id_popup = None
             self._build_ui()
 
     # --- ingest: called for every incoming batch, does NO UI work ---------------
@@ -136,6 +140,7 @@ class CanTable(QWidget):
     def on_msgs(self, msgs):
         for msg in msgs:
             self._pending[msg.can_id] = msg   # coalesce: newest per id wins
+        self.new_frame.emit(msgs)
     
     # --- render (at most 20x/sec) ---------------------------------------------
     def _flush_pending(self):

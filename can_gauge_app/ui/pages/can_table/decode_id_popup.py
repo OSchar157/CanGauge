@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
 
-from cantools.database import Message, Signal, Database
+from cantools.database import Message, Signal, Database, Message
 from cantools.database.conversion import BaseConversion
 from cantools.database.can.signal import NamedSignalValue
 
@@ -19,7 +19,7 @@ TYPE_OPTS = ["Signed", "Unsigned"]
 
 SIGNAL_HEADERS = [
             "Name", "Type", "Order", "Start Bit", "Length",
-            "Scale", "Offset", "Min", "Max", "Unit",
+            "Scale", "Offset", "Min", "Max", "Unit", "Value"
             ]
 
 class DecodeIdPopup(QDialog):
@@ -28,6 +28,8 @@ class DecodeIdPopup(QDialog):
         self.can_id = can_id
         self.data_len = data_len
         self.db = db
+
+        self.cur_msg = None
 
         self.setWindowTitle(f"Decode CAN ID: {can_id}")
 
@@ -51,55 +53,60 @@ class DecodeIdPopup(QDialog):
 
         self.main_layout.addLayout(btn_layout)
 
-    def _on_click_save_btn(self):
-        new_signals = []
-        for row in range(self.signals_table.rowCount()):
-            for col in range(self.signals_table.columnCount()):
-                widget = self.signals_table.cellWidget(row, col)
+    def _get_signal_from_table_row(self, row: int, is_test: bool):
+        for col in range(self.signals_table.columnCount()):
+            widget = self.signals_table.cellWidget(row, col)
 
-                if isinstance(widget, QComboBox):
-                    text = widget.currentText()
-                elif isinstance(widget, QLineEdit):
-                    text = widget.text()
-                
-                col_header = self.signals_table.horizontalHeaderItem(col).text()
+            if isinstance(widget, QComboBox):
+                text = widget.currentText()
+            elif isinstance(widget, QLineEdit):
+                text = widget.text()
+            
+            col_header = self.signals_table.horizontalHeaderItem(col).text()
 
+            if not is_test:
                 if widget is None or text == "":
                     QMessageBox.critical(None, "Error", "Ayy cuh you done f'ed up. You ain't done filled e'rthing out.")
                     return
 
-                if col_header == "Name":
-                    name = text
-                elif col_header == "Type":
-                    is_signed = (text == TYPE_OPTS[0])
-                elif col_header == "Order":
-                    byte_order = "little_endian" if text == ORDER_OPTS[0] else "big_endian"
-                elif col_header == "Start Bit":
-                    start = int(text)
-                elif col_header == "Length":
-                    length = int(text)
-                elif col_header == "Scale":
-                    scale = float(text)
-                elif col_header == "Offset":
-                    offset = float(text)
-                elif col_header == "Min":
-                    minimum = float(text)
-                elif col_header == "Max":
-                    maximum = float(text)
-                elif col_header == "Unit":
-                    unit = text
-            
-            conversion = BaseConversion.factory(scale=scale, offset=offset, is_float=False)
-            signal = Signal(name=name,
-                            start=start,
-                            length=length,
-                            conversion=conversion,
-                            byte_order=byte_order,
-                            is_signed=is_signed,
-                            minimum=minimum,
-                            maximum=maximum,
-                            unit=unit
-                            )
+            if col_header == "Name":
+                name = text
+            elif col_header == "Type":
+                is_signed = (text == TYPE_OPTS[0])
+            elif col_header == "Order":
+                byte_order = "little_endian" if text == ORDER_OPTS[0] else "big_endian"
+            elif col_header == "Start Bit":
+                start = int(text)
+            elif col_header == "Length":
+                length = int(text)
+            elif col_header == "Scale":
+                scale = float(text)
+            elif col_header == "Offset":
+                offset = float(text)
+            elif col_header == "Min":
+                minimum = float(text)
+            elif col_header == "Max":
+                maximum = float(text)
+            elif col_header == "Unit":
+                unit = text
+        
+        conversion = BaseConversion.factory(scale=scale, offset=offset, is_float=False)
+        signal = Signal(name=name,
+                        start=start,
+                        length=length,
+                        conversion=conversion,
+                        byte_order=byte_order,
+                        is_signed=is_signed,
+                        minimum=minimum,
+                        maximum=maximum,
+                        unit=unit
+                        )
+        return signal
+
+    def _on_click_save_btn(self):
+        new_signals = []
+        for row in range(self.signals_table.rowCount()):
+            signal = self._get_signal_from_table_row(row, is_test=False)
             new_signals.append(signal)
 
         new_message = Message(
@@ -110,8 +117,6 @@ class DecodeIdPopup(QDialog):
             is_extended_frame=False,
             comment="Added via GUI",
         )
-
-        print(new_message, new_signals)
 
         self.db.messages.append(new_message)
         self.db.refresh()
@@ -185,27 +190,66 @@ class DecodeIdPopup(QDialog):
         row = self.signals_table.rowCount()
         self.signals_table.insertRow(row)
 
-        for i, col in enumerate(SIGNAL_HEADERS):
-            if col == "Type":
+        for i, col_name in enumerate(SIGNAL_HEADERS):
+            if col_name == "Type":
                 cell_widget = QComboBox()
                 cell_widget.setCurrentIndex(1)
                 cell_widget.addItems(TYPE_OPTS)
-            elif col == "Order":
+            elif col_name == "Order":
                 cell_widget = QComboBox()
                 cell_widget.setCurrentIndex(1)
                 cell_widget.addItems(ORDER_OPTS)
-            elif col in ["Start Bit", "Length"]:
+            elif col_name in ["Start Bit", "Length"]:
                 cell_widget = QLineEdit()
                 validator = QIntValidator(0, 64)
                 cell_widget.setValidator(validator)
-            elif col in ["Name", "Unit"]:
+            elif col_name in ["Name", "Unit"]:
                 cell_widget = QLineEdit()
+            elif col_name == "Value":
+                cell_widget = QLineEdit("N/A")
+                cell_widget.setReadOnly(True)
             else:
                 cell_widget = QLineEdit()
                 validator = QDoubleValidator()
                 cell_widget.setValidator(validator)
+
+            if isinstance(cell_widget, QLineEdit):
+                cell_widget.textChanged.connect(lambda letter, r=row: self._update_signal_row_val(r))
+            else:
+                cell_widget.currentIndexChanged.connect(lambda index, r=row: self._update_signal_row_val(r))
+
             
             self.signals_table.setCellWidget(row, i, cell_widget)
+
+    def _update_signal_row_val(self, row: int):
+        signal_val_col = len(SIGNAL_HEADERS) - 1
+        signal_val_widget = self.signals_table.cellWidget(row, signal_val_col)
+
+        try:
+            signal = self._get_signal_from_table_row(row, is_test=True)
+
+            message = Message(
+                frame_id= int(self.can_id.strip(), 16),
+                name="temp",
+                length=int(self.data_len),
+                signals=[signal],
+                is_extended_frame=False,
+                comment="temp",
+            )
+        
+            decoded = message.decode(self.cur_msg.raw_frame.data)
+            new_val = str(next(iter(decoded.values())))
+        except Exception as e:
+            print(e)
+            new_val = "N/A"
+
+        signal_val_widget.setText(new_val)
+
+    def on_new_frame(self, msgs):
+        for msg in reversed(msgs):
+            if msg.can_id == int(self.can_id.strip(), 16):
+                self.cur_msg = msg
+                break
 
     def remove_selected_row(self):
         row = self.signals_table.currentRow()

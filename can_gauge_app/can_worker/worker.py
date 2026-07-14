@@ -16,6 +16,7 @@ class DecodedMsg:
     channel: str
     signals: dict
     is_extended: bool
+    raw_frame: can.Message
 
 EMIT_FREQUENCY_HZ = 30
 
@@ -63,7 +64,8 @@ class CANWorker(QThread):
             data_len=msg.dlc,
             channel=msg.channel,
             signals=signals,
-            is_extended=msg.is_extended_id
+            is_extended=msg.is_extended_id,
+            raw_frame = msg
         )
 
         self.decoded_msg_buffer.append(decoded)
