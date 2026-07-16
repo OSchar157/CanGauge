@@ -1,12 +1,14 @@
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtCore import Qt
-import time
+
+from ui.utils import format_timestamp, format_data, get_data_for_gui
+
+from can import Message
+from cantools.database import Database
 
 
-from can_worker.worker import DecodedMsg
-
-MONO = "Consolas"  # or "JetBrains Mono", "Cascadia Code", whatever you've got
+MONO = "Consolas"
 
 BG = "#1e1e1e"
 FG = "#d4d4d4"
@@ -19,16 +21,18 @@ DATA_COLOR = "#d4d4d4"
 
 
 class CanStream(QtWidgets.QPlainTextEdit):
-    def __init__(self):
+    def __init__(self, can_db: Database):
         super().__init__()
+
+        self.can_db = can_db
+
         self.setReadOnly(True)
         self.setMaximumBlockCount(2000)
         self.setUndoRedoEnabled(False)
         self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         self.viewport().setCursor(Qt.CursorShape.ArrowCursor)
 
-        self.setFont(QtGui.QFont("Courier New", 19))
-        # self.setFont(_pick_mono_font(10))
+        self.setFont(QtGui.QFont(MONO, 19))
         self.setStyleSheet(f"""
             QPlainTextEdit {{
                 background-color: {BG};
@@ -38,23 +42,27 @@ class CanStream(QtWidgets.QPlainTextEdit):
         """)
         self.setViewportMargins(5, 5, 5, 5)
 
-    def on_msgs(self, msgs: list[DecodedMsg]):
+        self.recv_msgs = False
+
+    def on_msgs(self, msgs: list[Message]):
+        if not self.recv_msgs:
+            return
 
         scroll_bar = self.verticalScrollBar()
         was_at_bottom = scroll_bar.value() >= scroll_bar.maximum() - 4
         
         self.setUpdatesEnabled(False)
 
-        lines = []
+        new_rows = []
         for msg in msgs:
-            ts = time.strftime("%H:%M:%S", time.localtime(msg.timestamp)) + f".{int(msg.timestamp % 1 * 1000):03d}"
-            channel = msg.channel
-            can_id = f"{msg.can_id:03X}"
-            dlc_str = f"[{msg.data_len}]"
-            name = (msg.name or "").replace("_", " ")
-            data = msg.raw_hex
+            ts, channel, can_id, dlc_str, data = get_data_for_gui(msg)
 
-            line = (
+            try:
+                name = self.can_db.get_message_by_frame_id(msg.arbitration_id).name
+            except KeyError:
+                name = ""
+
+            row = (
                 f'<span style="color:{TS_COLOR}">{ts}</span>&nbsp;&nbsp;&nbsp;'
                 f'<span style="color:{CHANNEL_COLOR}">{_pad_html(channel, 8)}</span>'
                 f'<span style="color:{ID_COLOR}">{can_id:>3}</span>&nbsp;&nbsp;'
@@ -62,9 +70,9 @@ class CanStream(QtWidgets.QPlainTextEdit):
                 f'<span style="color:{NAME_COLOR}">{_pad_html(name, 24)}</span>'
                 f'<span style="color:{DATA_COLOR}">{data}</span>'
             )
-            lines.append(line)
+            new_rows.append(row)
 
-        self.appendHtml("<br>".join(lines))
+        self.appendHtml("<br>".join(new_rows))
 
         if was_at_bottom:
             scroll_bar.setValue(scroll_bar.maximum())
@@ -78,16 +86,3 @@ def _pad_html(text: str, width: int) -> str:
     if pad > 0:
         text = text + ("&nbsp;" * pad)
     return text
-
-def _pick_mono_font(point_size: int=10) -> QtGui.QFont:
-    candidates = ["JetBrains Mono", "Cascadia Mono", "Consolas", "DejaVu Sans Mono", "Courier New"]
-    families = set(QtGui.QFontDatabase().families())
-    for name in candidates:
-        if name in families:
-            print(name)
-            return QtGui.QFont(name, point_size)
-    # last resort: ask Qt for *any* monospace font on the system
-    font = QtGui.QFont()
-    font.setStyleHint(QtGui.QFont.Monospace)
-    font.setPointSize(point_size)
-    return font

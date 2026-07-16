@@ -7,60 +7,70 @@ from PyQt5.QtWidgets import (
 
 from ...gauge_widgets import Gauge
 
-from can_worker.worker import DecodedMsg
+from can import Message
+from cantools.database import Database
 
 
 class GaugePage(QWidget):
-    def __init__(self):
+    def __init__(self, can_db: Database):
         super().__init__()
+        
+        self.can_db = can_db
 
         master = QVBoxLayout()
-        # master.addStretch()
         self.setLayout(master)
 
         self.gauges_layout = QHBoxLayout()
         master.addLayout(self.gauges_layout)
 
-        # self.save_btn = QPushButton("Save Gauges")
-        # self.save_btn.clicked.connect(self._on_clicked_save)
-        # self.save_btn.setVisible(False)
-        # master.addWidget(self.save_btn)
+        self.gauges: dict[int, dict[str, list[Gauge]]] = {}
 
-        self.gauges: dict[str, list[Gauge]] = {}
         self.able_to_save = False
 
         self._next_id = 0
 
-    def on_msgs(self, msgs):
+        self.recv_msgs: bool = False
+
+    def on_msgs(self, msgs: list[Message]):
+        if not self.recv_msgs:
+            return
+        
         if not self.gauges:
             return
 
-        remaining = set(self.gauges.keys())
-
+        ids_to_update = set(self.gauges.keys())
         for msg in reversed(msgs):
-            if not remaining:
+            if not ids_to_update:
                 break
-            for name, value in msg.signals.items():
-                if name in remaining:
-                    for gauge in self.gauges[name]:
-                        try:
-                            gauge.set_value(value)
-                        except:
-                            print(name, value)
-                    remaining.discard(name)
-    
-    def add_gauge(self, gauge_type: Gauge, name: str, args):
-        # self.save_btn.setVisible(True)
-        
-        new_gauge = gauge_type(**args)
+            
+            can_id = msg.arbitration_id
+
+            if can_id not in ids_to_update:
+                continue
+            
+            decoded_msg_signals = self.can_db.decode_message(can_id, msg.data)
+
+            for sig_name, sig_value in decoded_msg_signals.items():
+                if sig_name not in self.gauges[can_id]:
+                    continue
+                for gauge in self.gauges[can_id][sig_name]:
+                        gauge.set_value(sig_value)
+                    
+                ids_to_update.discard(can_id)
+
+    def add_gauge(self, can_id: int, sig_name: str, gauge_type: Gauge, gauge_args: dict):
+        new_gauge = gauge_type(**gauge_args)
         
         new_gauge._id = self._next_id
         self._next_id += 1
 
-        if name not in self.gauges:
-            self.gauges[name] = []
+        if can_id not in self.gauges:
+            self.gauges[can_id] = {}
         
-        self.gauges[name].append(new_gauge)
+        if sig_name not in self.gauges[can_id]:
+            self.gauges[can_id][sig_name] = []
+
+        self.gauges[can_id][sig_name].append(new_gauge)
 
         layout = QVBoxLayout()
         layout.addWidget(new_gauge)
@@ -71,42 +81,24 @@ class GaugePage(QWidget):
         self.gauges_layout.addLayout(layout)
         self.able_to_save = True
 
-    def _on_clicked_save(self):
-        if not (self.gauges and self.able_to_save):
-            return
-        
-        gauges_jsons: list[dict] = []
-
-        for name, gauges in self.gauges.items():
-            for gauge in gauges:
-                gauge_json = gauge.to_json()
-                gauge_json["id_name"] = name
-                gauges_jsons.append(gauge_json)
-        
-        self.able_to_save = False
-
-        print(gauges_jsons)
-        with open("gauges.json", "w") as f:
-            json.dump(gauges_jsons, f, indent=2)
-
 class RemoveGaugeBtn(QPushButton):
     def __init__(self, layout, gauge, parent: GaugePage):
         super().__init__(parent, text="Remove")
         self.parent = parent
-        self.layout = layout
+        self.gauge_layout = layout
         self.gauge = gauge
         self.clicked.connect(self.rm_layout)
 
     def rm_layout(self):
-        while self.layout.count():
-            item = self.layout.takeAt(0)
+        while self.gauge_layout.count():
+            item = self.gauge_layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
                 widget.setParent(None)
                 widget.deleteLater()
 
-        self.parent.gauges_layout.removeItem(self.layout)
-        self.layout.deleteLater()
+        self.parent.gauges_layout.removeItem(self.gauge_layout)
+        self.gauge_layout.deleteLater()
 
         for gauges in self.parent.gauges.values():
             if self.gauge in gauges:

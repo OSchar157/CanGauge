@@ -55,6 +55,13 @@ class Shell(QWidget):
         self._page_index[name] = index
 
     def show_page(self, name: str):
-        self.pages.setCurrentIndex(self._page_index[name])
+        cur_page = self.pages.currentWidget()
+        cur_page.recv_msgs = False
+
+        show_page_index = self._page_index[name]
+        show_page_widget = self.pages.widget(show_page_index)
+        show_page_widget.recv_msgs = True
+        self.pages.setCurrentIndex(show_page_index)
+
         self.side_menu.setVisible(False)
         self.hamburger_btn.setVisible(True)

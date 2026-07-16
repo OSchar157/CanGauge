@@ -45,6 +45,8 @@ class NeedleGauge(Gauge):
     
     def __init__(
         self,
+        val_offset=0,
+        val_scale=1,
         min_val=0,
         max_val=100,
         warn_low=20,
@@ -57,6 +59,8 @@ class NeedleGauge(Gauge):
         parent=None
     ):
         super().__init__(
+            val_offset,
+            val_scale,
             min_val,
             max_val,
             warn_low,

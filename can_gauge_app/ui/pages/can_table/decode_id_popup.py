@@ -23,22 +23,24 @@ SIGNAL_HEADERS = [
             ]
 
 class DecodeIdPopup(QDialog):
-    def __init__(self, can_id, data_len, is_extended, db: Database, parent=None):
+    def __init__(self, can_id: int=None, data_len: int=None, is_extended: bool=False, can_db=None, parent=None):
         super().__init__(parent)
         self.can_id = can_id
         self.data_len = data_len
-        self.db = db
+        self.is_extended = is_extended
+        self.can_db = can_db
 
-        self.cur_msg = None
-
-        self.setWindowTitle(f"Decode CAN ID: {can_id}")
+        self.recv_msgs = False
+    
+    def build_ui(self):
+        self.setWindowTitle(f"Decode CAN ID: {self.can_id}")
 
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
 
         self.main_layout.addWidget(QLabel("Can Message:"))
 
-        self._init_can_message_table(can_id, data_len, is_extended)
+        self._init_can_message_table()
         self._init_can_signals_table()
 
         btn_layout = QVBoxLayout()
@@ -53,6 +55,10 @@ class DecodeIdPopup(QDialog):
 
         self.main_layout.addLayout(btn_layout)
 
+    def destroy_ui(self):
+        self.recv_msgs = False
+        self.main_layout = None
+    
     def _get_signal_from_table_row(self, row: int, is_test: bool):
         for col in range(self.signals_table.columnCount()):
             widget = self.signals_table.cellWidget(row, col)
@@ -80,12 +86,21 @@ class DecodeIdPopup(QDialog):
             elif col_header == "Length":
                 length = int(text)
             elif col_header == "Scale":
+                print(text == "")
+                if is_test and text == "":
+                    text = "1"
                 scale = float(text)
             elif col_header == "Offset":
+                if is_test and text == "":
+                    text = "0"
                 offset = float(text)
             elif col_header == "Min":
+                if is_test and text == "":
+                    minimum = text = "0"
                 minimum = float(text)
             elif col_header == "Max":
+                if is_test and text == "":
+                    text = "1"
                 maximum = float(text)
             elif col_header == "Unit":
                 unit = text
@@ -100,7 +115,7 @@ class DecodeIdPopup(QDialog):
                         minimum=minimum,
                         maximum=maximum,
                         unit=unit
-                        )
+                    )
         return signal
 
     def _on_click_save_btn(self):
@@ -110,20 +125,20 @@ class DecodeIdPopup(QDialog):
             new_signals.append(signal)
 
         new_message = Message(
-            frame_id= int(self.can_id.strip(), 16),
+            frame_id= self.can_id,
             name=self.name_line_edit.text(),
-            length=int(self.data_len),
+            length=self.data_len,
             signals=new_signals,
             is_extended_frame=False,
             comment="Added via GUI",
         )
 
-        self.db.messages.append(new_message)
-        self.db.refresh()
+        self.can_db.messages.append(new_message)
+        self.can_db.refresh()
 
         self.accept()
 
-    def _init_can_message_table(self, can_id, data_len, is_extended):
+    def _init_can_message_table(self):
         can_msg_table_layout = QHBoxLayout()
 
         #### NAME FIELD
@@ -136,7 +151,7 @@ class DecodeIdPopup(QDialog):
         #### CAN ID
         canid_layout = QVBoxLayout()
         canid_layout.addWidget(QLabel("CAN ID"))
-        self.canid_line_edit = QLineEdit(can_id)
+        self.canid_line_edit = QLineEdit(str(self.can_id))
         self.canid_line_edit.setReadOnly(True)
         canid_layout.addWidget(self.canid_line_edit)
         can_msg_table_layout.addLayout(canid_layout)
@@ -144,7 +159,7 @@ class DecodeIdPopup(QDialog):
         #### Type
         type_layout = QVBoxLayout()
         type_layout.addWidget(QLabel("Type"))
-        self.type_line_edit = QLineEdit("Extended" if is_extended else "Standard")
+        self.type_line_edit = QLineEdit("Extended" if self.is_extended else "Standard")
         self.type_line_edit.setReadOnly(True)
         type_layout.addWidget(self.type_line_edit)
         can_msg_table_layout.addLayout(type_layout)
@@ -152,7 +167,7 @@ class DecodeIdPopup(QDialog):
         #### Length
         length_layout = QVBoxLayout()
         length_layout.addWidget(QLabel("Length"))
-        self.length_line_edit = QLineEdit(data_len)
+        self.length_line_edit = QLineEdit(str(self.data_len))
         self.length_line_edit.setReadOnly(True)
         length_layout.addWidget(self.length_line_edit)
         can_msg_table_layout.addLayout(length_layout)
@@ -212,44 +227,43 @@ class DecodeIdPopup(QDialog):
                 cell_widget = QLineEdit()
                 validator = QDoubleValidator()
                 cell_widget.setValidator(validator)
-
-            if isinstance(cell_widget, QLineEdit):
-                cell_widget.textChanged.connect(lambda letter, r=row: self._update_signal_row_val(r))
-            else:
-                cell_widget.currentIndexChanged.connect(lambda index, r=row: self._update_signal_row_val(r))
-
             
             self.signals_table.setCellWidget(row, i, cell_widget)
 
-    def _update_signal_row_val(self, row: int):
+    def _update_signal_row_val(self, row: int, msg: Message):
         signal_val_col = len(SIGNAL_HEADERS) - 1
         signal_val_widget = self.signals_table.cellWidget(row, signal_val_col)
 
         try:
             signal = self._get_signal_from_table_row(row, is_test=True)
-
             message = Message(
-                frame_id= int(self.can_id.strip(), 16),
+                frame_id= self.can_id,
                 name="temp",
-                length=int(self.data_len),
+                length=self.data_len,
                 signals=[signal],
                 is_extended_frame=False,
-                comment="temp",
             )
         
-            decoded = message.decode(self.cur_msg.raw_frame.data)
-            new_val = str(next(iter(decoded.values())))
-        except Exception as e:
-            print(e)
+            decoded = message.decode(msg.data)
+            new_val = f"{next(iter(decoded.values())):.3f}"
+        except:
             new_val = "N/A"
 
         signal_val_widget.setText(new_val)
 
-    def on_new_frame(self, msgs):
+    def on_msgs(self, msgs: list[Message]):
+        if not self.recv_msgs:
+            return
+        
+        if not msgs:
+            return
+        
         for msg in reversed(msgs):
-            if msg.can_id == int(self.can_id.strip(), 16):
-                self.cur_msg = msg
-                break
+            if msg.arbitration_id != self.can_id:
+                continue
+
+            for row in range(self.signals_table.rowCount()):
+                self._update_signal_row_val(row, msg)
 
     def remove_selected_row(self):
         row = self.signals_table.currentRow()
