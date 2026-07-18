@@ -1,12 +1,15 @@
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtCore import Qt
-import time
+from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor
+
+from ui.utils import format_timestamp, format_data, get_data_for_gui
+
+from can import Message
+from cantools.database import Database
 
 
-from can_worker.worker import DecodedMsg
-
-MONO = "Consolas"  # or "JetBrains Mono", "Cascadia Code", whatever you've got
+MONO = "Consolas"
 
 BG = "#1e1e1e"
 FG = "#d4d4d4"
@@ -19,16 +22,19 @@ DATA_COLOR = "#d4d4d4"
 
 
 class CanStream(QtWidgets.QPlainTextEdit):
-    def __init__(self):
+    def __init__(self, can_db: Database):
         super().__init__()
+
+        self.shell = None
+        self.can_db = can_db
+
         self.setReadOnly(True)
         self.setMaximumBlockCount(2000)
         self.setUndoRedoEnabled(False)
         self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         self.viewport().setCursor(Qt.CursorShape.ArrowCursor)
 
-        self.setFont(QtGui.QFont("Courier New", 19))
-        # self.setFont(_pick_mono_font(10))
+        self.setFont(QtGui.QFont(MONO, 19))
         self.setStyleSheet(f"""
             QPlainTextEdit {{
                 background-color: {BG};
@@ -38,56 +44,66 @@ class CanStream(QtWidgets.QPlainTextEdit):
         """)
         self.setViewportMargins(5, 5, 5, 5)
 
-    def on_msgs(self, msgs: list[DecodedMsg]):
+        self._scratch_doc = QtGui.QTextDocument()
+        self._scratch_cursor = QTextCursor(self._scratch_doc)
+
+        # Cache the character format objects so we never recreate them in the loop
+        self._fmt_ts = QTextCharFormat()
+        self._fmt_ts.setForeground(QColor(TS_COLOR))
+
+        self._fmt_channel = QTextCharFormat()
+        self._fmt_channel.setForeground(QColor(CHANNEL_COLOR))
+
+        self._fmt_id = QTextCharFormat()
+        self._fmt_id.setForeground(QColor(ID_COLOR))
+
+        self._fmt_dlc = QTextCharFormat()
+        self._fmt_dlc.setForeground(QColor(DLC_COLOR))
+
+        self._fmt_name = QTextCharFormat()
+        self._fmt_name.setForeground(QColor(NAME_COLOR))
+
+        self._fmt_data = QTextCharFormat()
+        self._fmt_data.setForeground(QColor(DATA_COLOR))
+
+    def on_msgs(self, msgs: list[Message]):
+        if not msgs:
+            return
 
         scroll_bar = self.verticalScrollBar()
         was_at_bottom = scroll_bar.value() >= scroll_bar.maximum() - 4
         
         self.setUpdatesEnabled(False)
 
-        lines = []
+        # 1. Clear the reusable scratchpad document entirely
+        self._scratch_doc.clear()
+        # Reset cursor position to the start of the cleared document
+        self._scratch_cursor.movePosition(QTextCursor.Start)
+
+        get_name = self.can_db.get_message_by_frame_id
+
         for msg in msgs:
-            ts = time.strftime("%H:%M:%S", time.localtime(msg.timestamp)) + f".{int(msg.timestamp % 1 * 1000):03d}"
-            channel = msg.channel
-            can_id = f"{msg.can_id:03X}"
-            dlc_str = f"[{msg.data_len}]"
-            name = (msg.name or "").replace("_", " ")
-            data = msg.raw_hex
+            ts, channel, can_id, dlc_str, data = get_data_for_gui(msg)
 
-            line = (
-                f'<span style="color:{TS_COLOR}">{ts}</span>&nbsp;&nbsp;&nbsp;'
-                f'<span style="color:{CHANNEL_COLOR}">{_pad_html(channel, 8)}</span>'
-                f'<span style="color:{ID_COLOR}">{can_id:>3}</span>&nbsp;&nbsp;'
-                f'<span style="color:{DLC_COLOR}">{_pad_html(dlc_str, 6)}</span>'
-                f'<span style="color:{NAME_COLOR}">{_pad_html(name, 24)}</span>'
-                f'<span style="color:{DATA_COLOR}">{data}</span>'
-            )
-            lines.append(line)
+            try:
+                name = get_name(msg.arbitration_id).name
+            except KeyError:
+                name = ""
 
-        self.appendHtml("<br>".join(lines))
+            # Write into the existing, allocated scratchpad memory
+            self._scratch_cursor.insertText(f"{ts}   ", self._fmt_ts)
+            self._scratch_cursor.insertText(f"{channel:<8}", self._fmt_channel)
+            self._scratch_cursor.insertText(f"{can_id:>3}  ", self._fmt_id)
+            self._scratch_cursor.insertText(f"{dlc_str:<6}", self._fmt_dlc)
+            self._scratch_cursor.insertText(f"{name:<24}", self._fmt_name)
+            self._scratch_cursor.insertText(f"{data}\n", self._fmt_data)
+
+        # 2. Drop the compiled fragment into the main visible text box
+        ui_cursor = self.textCursor()
+        ui_cursor.movePosition(QTextCursor.End)
+        ui_cursor.insertFragment(QtGui.QTextDocumentFragment(self._scratch_doc))
 
         if was_at_bottom:
             scroll_bar.setValue(scroll_bar.maximum())
 
         self.setUpdatesEnabled(True)
-
-def _pad_html(text: str, width: int) -> str:
-    """Pad with non-breaking spaces so HTML rendering doesn't collapse it."""
-    text = str(text)
-    pad = width - len(text)
-    if pad > 0:
-        text = text + ("&nbsp;" * pad)
-    return text
-
-def _pick_mono_font(point_size: int=10) -> QtGui.QFont:
-    candidates = ["JetBrains Mono", "Cascadia Mono", "Consolas", "DejaVu Sans Mono", "Courier New"]
-    families = set(QtGui.QFontDatabase().families())
-    for name in candidates:
-        if name in families:
-            print(name)
-            return QtGui.QFont(name, point_size)
-    # last resort: ask Qt for *any* monospace font on the system
-    font = QtGui.QFont()
-    font.setStyleHint(QtGui.QFont.Monospace)
-    font.setPointSize(point_size)
-    return font

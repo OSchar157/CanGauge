@@ -18,6 +18,8 @@ class Gauge(QWidget):
     @classmethod
     def get_fields(cls) -> list[ParamSpec]:
         return [
+            ParamSpec("val_offset", "Value Offset", float),
+            ParamSpec("val_scale", "Value Scale", float),
             ParamSpec("min_val", "Minimum Value", int),
             ParamSpec("max_val", "Maximum Value", int),
             ParamSpec("warn_low", "Warning Low", int),
@@ -28,11 +30,14 @@ class Gauge(QWidget):
             ParamSpec("label", "Label", str),
         ]
 
-    def __init__(self, min_val: float, max_val: str, warn_low: float, 
-                 warn_high: float, danger_low: float, danger_high: float, 
+    def __init__(self, val_offset: float, val_scale: float, min_val: float, 
+                 max_val: str, warn_low: float, warn_high: float, 
+                 danger_low: float, danger_high: float, 
                  unit: str, label: str, parent = None):
         super().__init__(parent)
 
+        self.val_offset = val_offset
+        self.val_scale = val_scale
         self.min_val = min_val
         self.max_val = max_val
         self.warn_low = warn_low
@@ -45,18 +50,9 @@ class Gauge(QWidget):
         self._id = None
 
     def set_value(self, value: float):
-        self._value = max(self.min_val, min(self.max_val, value))
+        set_val = (value * self.val_scale) + self.val_offset
+        self._value = max(self.min_val, min(self.max_val, set_val))
         self.update()
 
     def value(self) -> float:
         return self._value
-    
-    def to_json(self):
-        sig = inspect.signature(self.__class__.__init__)
-        data = {"type": self.__class__.__name__}
-        for name, param in sig.parameters.items():
-            if name in ("self", "parent"):
-                continue
-            data[name] = getattr(self, name)
-        data["id"] = self._id
-        return data

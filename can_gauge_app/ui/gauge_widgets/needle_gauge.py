@@ -19,10 +19,9 @@ WARNING_ZONE_COLOR = "#E8A020"
 DANGER_ZONE_COLOR = "#CC2200"
 SAFE_ZONE_COLOR = "#ffffff"
 
-NUM_MAJOR_TICKS = 14
 NUM_MINOR_TICKS = 3
 
-class SimpleGauge(Gauge):
+class NeedleGauge(Gauge):
     """
     Reusable gauge widget.
 
@@ -33,13 +32,21 @@ class SimpleGauge(Gauge):
         warn_high        (float):    value where high warning zone begins
         danger_low      (float):    value where low danger zone ends
         danger_high     (float):    value where high danger zone begins
+        maj_ticks       (int):      number of major tick marks
         untit           (str):      units of the value
+
     """
 
-    name = "Simple Gauge"
+    name = "Needle Gauge"
+
+    @classmethod
+    def get_fields(cls) -> list[ParamSpec]:
+        return Gauge.get_fields() + [ParamSpec("maj_ticks", "Major Ticks", int)]
     
     def __init__(
         self,
+        val_offset=0,
+        val_scale=1,
         min_val=0,
         max_val=100,
         warn_low=20,
@@ -48,9 +55,12 @@ class SimpleGauge(Gauge):
         danger_high=90,
         unit="",
         label="",
+        maj_ticks=10,
         parent=None
     ):
         super().__init__(
+            val_offset,
+            val_scale,
             min_val,
             max_val,
             warn_low,
@@ -61,6 +71,8 @@ class SimpleGauge(Gauge):
             label,
             parent
         )
+    
+        self.maj_ticks = maj_ticks
 
     def to_json(self):
         return super().to_json()
@@ -128,7 +140,7 @@ class SimpleGauge(Gauge):
         self._draw_segment(painter, pen, ang_danger_high, ang_end, DANGER_ZONE_COLOR)
 
     def _draw_ticks(self, painter):
-        total_ticks = NUM_MAJOR_TICKS * NUM_MINOR_TICKS + NUM_MAJOR_TICKS
+        total_ticks = self.maj_ticks * NUM_MINOR_TICKS + self.maj_ticks
         middle_minor = (NUM_MINOR_TICKS + 1) // 2  # index within group that is middle
 
         for i in range(total_ticks + 1):
@@ -166,8 +178,8 @@ class SimpleGauge(Gauge):
         font = QFont("Courier New", 7, QFont.Bold)
         painter.setFont(font)
 
-        for i in range(NUM_MAJOR_TICKS + 1):
-            frac = i / NUM_MAJOR_TICKS
+        for i in range(self.maj_ticks + 1):
+            frac = i / self.maj_ticks
             val = int(self.min_val + frac * (self.max_val - self.min_val))
             angle = math.radians(225 - frac * 270)
 

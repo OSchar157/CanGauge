@@ -1,188 +1,191 @@
 from PyQt5.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QWidget, QVBoxLayout,
-    QPushButton, QLabel, QFormLayout, QHeaderView
+    QPushButton, QLabel, QFormLayout, QHeaderView,
+    QDialog
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from can_worker.worker import DecodedMsg
 from ui.pages.can_table.create_gauge_popup import CreateGaugePopup
-from collections import defaultdict
 from ui.pages.can_table.decode_id_popup import DecodeIdPopup
+from ui.utils import format_timestamp, format_data
+
+from cantools.database import Database
+from can import Message
 
 class CanTable(QWidget):
-    data_updated = pyqtSignal()
-
-    def __init__(self, on_gauge_requested, parent=None):
+    def __init__(self, on_gauge_requested, can_db: Database, parent=None):
         super().__init__(parent)
 
+        self.shell = None
+
         self.on_gauge_requested = on_gauge_requested
+        self.can_db = can_db
+
+        self.decode_id_popup = None
+        self.create_gauge_popup = None
+
+        self._current_sort_col = 2  # Default to ID column matching your initial setup
+        self._current_sort_order = Qt.AscendingOrder
+
+        self._build_ui()
+
+    def _build_ui(self):
+        if self.layout() is not None:
+            QWidget().setLayout(self.layout())
 
         layout = QVBoxLayout(self)
 
         self.tree = QTreeWidget()
         self.tree.setColumnCount(6)
         self.tree.setHeaderLabels(["Timestamp", "Interface", "ID", "Data Len", "Name", "Data"])
-        self.tree.setSortingEnabled(True)
-        self.tree.sortItems(2, Qt.AscendingOrder)
+        self.tree.setSortingEnabled(False)
+        # self.tree.sortItems(2, Qt.AscendingOrder)
         layout.addWidget(self.tree)
 
-        self.tree.collapseAll()  # start collapsed
+        table_header = self.tree.header()
+        table_header.setSectionsClickable(True)
+        table_header.sectionClicked.connect(self._manual_sort_table)
 
-        self._ids_seen = {}   # can_id -> {"data": DecodedMsg, "widget": QTreeWidgetItem}
-        self._pending = {}    # can_id -> newest DecodedMsg since last flush
-    
-        self._ui_timer = QTimer(self)
-        self._ui_timer.setInterval(50)      # 20 fps; bump to 100 ms if you want
-        self._ui_timer.timeout.connect(self._flush_pending)
-        self._ui_timer.start()
-    
-        self.tree.itemExpanded.connect(self._on_item_expanded)
-    
-        # 1) Sorting is OFF permanently while streaming. We only sort when the
-        #    user clicks a header (and when a brand-new id appears, to keep
-        #    their chosen order valid -- rare after startup).
-        self._sort_column = -1
-        self._sort_order = Qt.AscendingOrder
-        self.tree.setSortingEnabled(False)
-        header = self.tree.header()
-        header.setSectionsClickable(True)
-        header.setSortIndicatorShown(True)
-        header.sectionClicked.connect(self._on_header_clicked)
-    
-        # 2) If any column used ResizeToContents, every setText forced the header
-        #    to re-measure that column across all rows. Interactive + a one-time
-        #    measure at startup avoids that entirely.
-        header.setSectionResizeMode(QHeaderView.Interactive)
-        for col in range(self.tree.columnCount()):
-            self.tree.resizeColumnToContents(col)
+        self.tree.collapseAll()
 
-    def add_row(self, timestamp: str, interface: str, id_: str, data_len: str, name: str, data: str, signals: dict, is_extended: bool):
-        can_id = f"{id_:03X}"
-        item = QTreeWidgetItem([timestamp, interface, can_id, data_len, name, data])
+        self.can_ids_seen: dict[int, QWidget] = {}
+
+    def _manual_sort_table(self, col: int):
+        # 1. Flip order if clicking the same column, otherwise default to Ascending
+        if self._current_sort_col == col:
+            if self._current_sort_order == Qt.AscendingOrder:
+                self._current_sort_order = Qt.DescendingOrder
+            else:
+                self._current_sort_order = Qt.AscendingOrder
+        else:
+            self._current_sort_col = col
+            self._current_sort_order = Qt.AscendingOrder
+            
+        # 2. Force the header triangle icon to match your tracked state
+        table_header = self.tree.header()
+        table_header.setSortIndicator(self._current_sort_col, self._current_sort_order)
+        
+        # 3. Fire the single manual sort execution pass
+        self.tree.sortItems(self._current_sort_col, self._current_sort_order)
+
+    def add_row(self, raw_msg: Message, msg_name: str, id_is_decodable: bool):
+        can_id = raw_msg.arbitration_id
+
+        item = QTreeWidgetItem(["", str(raw_msg.channel), f"{can_id:02X}", str(raw_msg.dlc), msg_name, ""])
         self.tree.addTopLevelItem(item)
 
         # child item that holds the expanded custom widget area
         child = QTreeWidgetItem(item)
         item.addChild(child)
-        self.tree.setFirstItemColumnSpanned(child, True)  # let it span all columns
+        self.tree.setFirstItemColumnSpanned(child, True)
 
         expand_widget = QWidget()
         expand_layout = QVBoxLayout(expand_widget)
         expand_layout.setAlignment(Qt.AlignLeft)
 
-        # show the signals and a 'create gauge' button
-        if signals:
-            item.signal_labels = {}
-
-            signals_form = QFormLayout()
-            signals_form.setFormAlignment(Qt.AlignLeft)
-
-            for key, value in signals.items():
-                key_label = QLabel(f"{key}:")
-                value_label = QLabel(format_signal_value(value))
-                item.signal_labels[key] = value_label
-                signals_form.addRow(key_label, value_label)
-
-            expand_layout.addLayout(signals_form)
-
-            # Create Gauge Button
-            create_gauge_btn = QPushButton("Create Gauge")
-            create_gauge_btn.clicked.connect(
-                lambda checked, n=name, s=signals: self.on_click_create_gauge_btn(n, s)
-            )
-            expand_layout.addWidget(create_gauge_btn)
+        if id_is_decodable:
+            self._build_signals_section(item, expand_layout, can_id)
         else:
-            decode_btn = QPushButton("Decode")
-            decode_btn.clicked.connect(lambda checked, i=can_id, d=data_len, e=is_extended: self.on_click_decode_btn(i, d, e))
-            expand_layout.addWidget(decode_btn)
+            self._build_decode_section(expand_layout, raw_msg)
 
         self.tree.setItemWidget(child, 0, expand_widget)
 
-        return item
+        self.can_ids_seen[can_id] = item
+    
+    def _build_signals_section(self, item: QTreeWidgetItem, layout: QVBoxLayout, can_id: int):
+        signal_labels: dict[str, QLabel] = {}
+        item.signal_labels = signal_labels
 
-    def on_click_create_gauge_btn(self, name, signals):
-        self.gauge_creation_popup = CreateGaugePopup(self, name, signals, self.on_gauge_requested)
-        self.gauge_creation_popup.exec()
+        signals_form = QFormLayout()
+        signals_form.setFormAlignment(Qt.AlignLeft)
 
-    def on_click_decode_btn(self, can_id, data_len, is_extended):
-        self.decode_id_popup = DecodeIdPopup(can_id, data_len, is_extended, parent=self)
-        self.decode_id_popup.exec()
+        signals = self.can_db.get_message_by_frame_id(can_id).signals
 
-    # --- ingest: called for every incoming batch, does NO UI work ---------------
-    def _on_header_clicked(self, col):
-        if col == self._sort_column:
-            self._sort_order = (
-                Qt.DescendingOrder
-                if self._sort_order == Qt.AscendingOrder
-                else Qt.AscendingOrder
-            )
-        else:
-            self._sort_column = col
-            self._sort_order = Qt.AscendingOrder
-        self.tree.sortItems(col, self._sort_order)
-        self.tree.header().setSortIndicator(col, self._sort_order)
+        for signal in signals:
+            sig_name = signal.name
+            sig_name_label = QLabel(f"{sig_name}:")
+            value_label = QLabel("")
+            item.signal_labels[sig_name] = value_label
+            signals_form.addRow(sig_name_label, value_label)
+
+        layout.addLayout(signals_form)
+
+        create_gauge_btn = QPushButton("Create Gauge")
+
+        can_msg_name = self.can_db.get_message_by_frame_id(can_id).name
+        signal_names = [signal.name for signal in signals]
+
+        create_gauge_btn.clicked.connect(
+            lambda checked,i=can_id, n=can_msg_name, s=signal_names: self.on_click_create_gauge_btn(i, n, s)
+        )
+
+        layout.addWidget(create_gauge_btn)
+
+    def _build_decode_section(self, layout: QVBoxLayout, msg: Message):
+        decode_btn = QPushButton("Decode")
+        decode_btn.clicked.connect(lambda checked, m=msg: self.on_click_decode_btn(m))
+        layout.addWidget(decode_btn)
+        
+    def on_click_create_gauge_btn(self, can_id, can_msg_name, signal_names):
+        self.create_gauge_popup = CreateGaugePopup(self, can_id, can_msg_name, signal_names, self.on_gauge_requested)
+        self.create_gauge_popup.exec()
+
+    def on_click_decode_btn(self, msg: Message):
+        self.decode_id_popup = DecodeIdPopup(can_id=msg.arbitration_id, data_len=msg.dlc,
+                                             is_extended=msg.is_extended_id, can_db=self.can_db)
+        self.shell.worker.msg_buffer_emitter.connect(self.decode_id_popup.on_msgs)
+
+        if self.decode_id_popup.exec_() == QDialog.Accepted:
+            self.shell.worker.msg_buffer_emitter.disconnect(self.decode_id_popup.on_msgs)
+            self.decode_id_popup = None
+            self._build_ui()
+
+    def on_msgs(self, msgs: list[Message]):
+        can_ids_to_update = set(msg.arbitration_id for msg in msgs)
+        new_can_ids = can_ids_to_update.difference(self.can_ids_seen)
+
+        self.tree.setUpdatesEnabled(False)
+
+        db_get_msg = self.can_db.get_message_by_frame_id
+        fmt_ts = format_timestamp
+        fmt_data = format_data
+        fmt_sig = format_signal_value
+        ids_seen = self.can_ids_seen
+
+        for msg in reversed(msgs):
+            if not can_ids_to_update:
+                break
+
+            can_id = msg.arbitration_id
+            if can_id not in can_ids_to_update:
+                continue
+
+            try:
+                db_msg = db_get_msg(can_id)
+                decoded_msg_signals = db_msg.decode(msg.data)
+                msg_name = db_msg.name
+                is_decodable = True
+            except KeyError:
+                msg_name = ""
+                is_decodable = False
+
+            if can_id in new_can_ids:
+                self.add_row(msg, msg_name, is_decodable)
+
+            item = ids_seen[can_id]
+            item.setText(0, fmt_ts(msg.timestamp))
+            item.setText(5, fmt_data(msg.data))
+
+            can_ids_to_update.discard(can_id)
+
+            if not is_decodable:
+                continue
+
+            signal_labels = item.signal_labels
+            for sig_name, sig_val in decoded_msg_signals.items():
+                if sig_name in signal_labels:
+                    signal_labels[sig_name].setText(fmt_sig(sig_val))
     
-    # --- ingest -------------------------------------------------------------------
-    def on_msgs(self, msgs):
-        for msg in msgs:
-            self._pending[msg.can_id] = msg   # coalesce: newest per id wins
-    
-    # --- render (at most 20x/sec) ---------------------------------------------
-    def _flush_pending(self):
-        if not self._pending:
-            return
-        pending, self._pending = self._pending, {}
-    
-        # No setUpdatesEnabled / setSortingEnabled toggling anymore. With ~50
-        # rows, letting Qt repaint just the changed cells is cheaper than
-        # forcing a full-tree repaint every flush.
-        new_rows = False
-        for can_id, msg in pending.items():
-            entry = self._ids_seen.get(can_id)
-            if entry is None:
-                item = self.add_row(
-                    format_time(msg.timestamp),
-                    msg.channel,
-                    can_id,
-                    f"[{msg.data_len}]",
-                    (msg.name or "").replace("_", " "),
-                    msg.raw_hex,
-                    msg.signals,
-                    msg.is_extended
-                )
-                item.can_id = can_id
-                self._ids_seen[can_id] = {"data": msg, "widget": item}
-                new_rows = True
-            else:
-                entry["data"] = msg
-                item = entry["widget"]
-                item.setText(0, format_time(msg.timestamp))
-                item.setText(3, f"[{msg.data_len}]")
-                item.setText(5, msg.raw_hex)
-                if item.isExpanded():
-                    self._refresh_signal_labels(item, msg.signals)
-    
-        # Keep the user's chosen sort valid when a new id shows up.
-        if new_rows and self._sort_column >= 0:
-            self.tree.sortItems(self._sort_column, self._sort_order)
-    
-    
-    def _refresh_signal_labels(self, item, signals):
-        labels = getattr(item, "signal_labels", None)
-        if not labels:
-            return
-        for sig_name, value in signals.items():
-            label = labels.get(sig_name)
-            if label is not None:
-                label.setText(format_signal_value(value))
-    
-    def _on_item_expanded(self, item):
-        entry = self._ids_seen.get(getattr(item, "can_id", None))
-        if entry is not None:
-            self._refresh_signal_labels(item, entry["data"].signals)
-    
-import time
-def format_time(timestamp):
-    return time.strftime("%H:%M:%S", time.localtime(timestamp or time.time())) + f".{int((timestamp or 0) % 1 * 1000):03d}"
+        self.tree.setUpdatesEnabled(True)
 
 def format_signal_value(value):
     if isinstance(value, float):

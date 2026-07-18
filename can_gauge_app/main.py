@@ -13,7 +13,7 @@ from ui.pages.can_stream.can_stream import CanStream
 bitrate = 500000
 using_can0 = True
 
-def init_interface(db) -> CANWorker:
+def init_interface() -> CANWorker:
     bus_name = f"{'can0' if using_can0 else 'can1'}"
 
     os.system(f'sudo ifconfig {bus_name} down')
@@ -21,7 +21,7 @@ def init_interface(db) -> CANWorker:
     os.system(f'sudo ifconfig {bus_name} up')
 
     bus = can.interface.Bus(channel=bus_name, interface='socketcan')
-    worker = CANWorker(bus, db)
+    worker = CANWorker(bus)
 
     return worker
 
@@ -30,32 +30,28 @@ if __name__ == "__main__":
     app.setApplicationName("CanGauge") 
     app.setDesktopFileName("CanGauge")
 
-    shell = Shell()
-    gauge_page = GaugePage()
-    can_table = CanTable(on_gauge_requested=gauge_page.add_gauge)
-    can_stream = CanStream()
-
-    shell.add_page("gauge", gauge_page)
-    shell.add_page("cantable", can_table)
-    shell.add_page("canstream", can_stream)
-    shell.show_page("cantable")
-
     db = cantools.database.Database()
-    db.add_dbc_string(open('../subaru_global.dbc').read())
+    db.add_dbc_string(open('../subaru_global_TESTING.dbc').read())
 
     if len(sys.argv) == 1:
-        worker = init_interface(db)
+        worker = init_interface()
     elif len(sys.argv) == 2 and sys.argv[1] == "test":
-        worker = DemoCANWoker(db)
+        worker = DemoCANWoker()
     elif len(sys.argv) == 3 and sys.argv[1] == "test" and int(sys.argv[2]) >= 100:
-        worker = DemoCANWoker(db, int(sys.argv[2]))
+        worker = DemoCANWoker(msg_interval=int(sys.argv[2]))
     else:
         print("usage: python main.py ['test'] [100]")
         sys.exit(1)
     
-    worker.decoded_msg_buffer_emitter.connect(gauge_page.on_msgs)
-    worker.decoded_msg_buffer_emitter.connect(can_table.on_msgs)
-    worker.decoded_msg_buffer_emitter.connect(can_stream.on_msgs)
+    shell = Shell(worker)
+    gauge_page = GaugePage(can_db=db)
+    can_table = CanTable(on_gauge_requested=gauge_page.add_gauge, can_db=db)
+    can_stream = CanStream(can_db=db)
+
+    shell.add_page("gauge", gauge_page)
+    shell.add_page("cantable", can_table)
+    shell.add_page("canstream", can_stream)
+    shell.show_page("canstream")
     
     worker.start()
 
