@@ -25,12 +25,18 @@ SIGNAL_HEADERS = [
             ]
 
 class DecodeIdPopup(QDialog):
-    def __init__(self, can_id: int=None, data_len: int=None, is_extended: bool=False, can_db=None, parent=None):
+    def __init__(self, msg: Message, can_db: Database=None, parent=None):
         super().__init__(parent)
-        self.can_id = can_id
-        self.data_len = data_len
-        self.is_extended = is_extended
+        self.can_id = msg.arbitration_id
+        self.data_len = msg.dlc
+        self.is_extended = msg.is_extended_id
         self.can_db = can_db
+
+        try:
+            self.can_msg_from_dbc = can_db.get_message_by_frame_id(self.can_id)
+            self.signals = self.can_msg_from_dbc.signals
+        except:
+            self.signals = None
 
         self.setWindowTitle(f"Decode CAN ID: {dec_to_hex(self.can_id)}")
 
@@ -99,7 +105,6 @@ class DecodeIdPopup(QDialog):
             elif col_header == "Length":
                 length = int(text)
             elif col_header == "Scale":
-                print(text == "")
                 if is_test and text == "":
                     text = "1"
                 scale = float(text)
@@ -158,6 +163,11 @@ class DecodeIdPopup(QDialog):
         except Exception as e:
             QMessageBox.critical(None, "Error", f"There is a problem with the signals.\n{e}")
             return
+
+        try:
+            self.can_db.messages.remove(self.can_msg_from_dbc)
+        except:
+            pass
 
         self.can_db.messages.append(new_message)
         self.can_db.refresh()
@@ -225,34 +235,67 @@ class DecodeIdPopup(QDialog):
 
         self.main_layout.addLayout(can_signals_layout)
 
-        self.add_signal_row()
+        if not self.signals:
+            self.add_signal_row()
+            return
+        
+        for signal in self.signals:
+            self.add_signal_row(signal)
 
-    def add_signal_row(self):
+    def add_signal_row(self, signal: Signal | None = None):
         row = self.signals_table.rowCount()
         self.signals_table.insertRow(row)
+
+        if signal:
+            type_opt_index = 0 if signal.is_signed else 1
+            order_opt_index = 0 if signal.byte_order == "little_endian" else 1
+            start_bit = str(signal.start)
+            bit_length = str(signal.length)
+            name = signal.name
+            unit = signal.unit if signal.unit else ""
+            scale = str(signal.scale)
+            offset = str(signal.offset)
+            min_val = str(signal.minimum) if signal.minimum else ""
+            max_val = str(signal.maximum) if signal.maximum else ""
+        else:
+            type_opt_index = order_opt_index = 1
+            start_bit= bit_length= name= unit= scale= offset = ""
+
+        int_validator = QIntValidator(0, 64)
+        double_validator = QDoubleValidator()
 
         for i, col_name in enumerate(SIGNAL_HEADERS):
             if col_name == "Type":
                 cell_widget = QComboBox()
-                cell_widget.setCurrentIndex(1)
                 cell_widget.addItems(TYPE_OPTS)
+                cell_widget.setCurrentIndex(type_opt_index)
             elif col_name == "Order":
                 cell_widget = QComboBox()
-                cell_widget.setCurrentIndex(1)
                 cell_widget.addItems(ORDER_OPTS)
-            elif col_name in ["Start Bit", "Length"]:
-                cell_widget = QLineEdit()
-                validator = QIntValidator(0, 64)
-                cell_widget.setValidator(validator)
-            elif col_name in ["Name", "Unit"]:
-                cell_widget = QLineEdit()
+                cell_widget.setCurrentIndex(order_opt_index)
+            elif col_name == "Length":
+                cell_widget = QLineEdit(bit_length)
+                cell_widget.setValidator(int_validator)
+            elif col_name == "Start Bit":
+                cell_widget = QLineEdit(start_bit)
+                cell_widget.setValidator(int_validator)
+            elif col_name == "Name":
+                cell_widget = QLineEdit(name)
+            elif col_name == "Unit":
+                cell_widget = QLineEdit(unit)
             elif col_name == "Value":
                 cell_widget = QLineEdit("N/A")
                 cell_widget.setReadOnly(True)
-            else:
-                cell_widget = QLineEdit()
-                validator = QDoubleValidator()
-                cell_widget.setValidator(validator)
+            elif col_name == "Scale":
+                cell_widget = QLineEdit(scale)
+                cell_widget.setValidator(double_validator)
+            elif col_name == "Offset":
+                cell_widget = QLineEdit(offset)
+                cell_widget.setValidator(double_validator)
+            elif col_name == "Min":
+                cell_widget = QLineEdit(min_val)
+            elif col_name == "Max":
+                cell_widget = QLineEdit(max_val)
             
             self.signals_table.setCellWidget(row, i, cell_widget)
 

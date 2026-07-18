@@ -83,7 +83,7 @@ class CanTable(QWidget):
         expand_layout.setAlignment(Qt.AlignLeft)
 
         if id_is_decodable:
-            self._build_signals_section(item, expand_layout, can_id)
+            self._build_signals_section(item, expand_layout, raw_msg)
         else:
             self._build_decode_section(expand_layout, raw_msg)
 
@@ -91,7 +91,9 @@ class CanTable(QWidget):
 
         self.can_ids_seen[can_id] = item
     
-    def _build_signals_section(self, item: QTreeWidgetItem, layout: QVBoxLayout, can_id: int):
+    def _build_signals_section(self, item: QTreeWidgetItem, layout: QVBoxLayout, raw_msg: Message):
+        can_id = raw_msg.arbitration_id
+
         signal_labels: dict[str, QLabel] = {}
         item.signal_labels = signal_labels
 
@@ -120,7 +122,7 @@ class CanTable(QWidget):
         btn_layout.addWidget(create_gauge_btn)
 
         edit_encoding_btn = QPushButton("Edit Encoding")
-        edit_encoding_btn.clicked.connect(self.on_click_edit_encoding_btn)
+        edit_encoding_btn.clicked.connect(lambda checked, m=raw_msg: self.on_click_decode_btn(m))
         btn_layout.addWidget(edit_encoding_btn)
 
         layout.addLayout(btn_layout)
@@ -135,8 +137,7 @@ class CanTable(QWidget):
         self.create_gauge_popup.exec()
 
     def on_click_decode_btn(self, msg: Message):
-        self.decode_id_popup = DecodeIdPopup(can_id=msg.arbitration_id, data_len=msg.dlc,
-                                             is_extended=msg.is_extended_id, can_db=self.can_db)
+        self.decode_id_popup = DecodeIdPopup(msg=msg, can_db=self.can_db)
         self.shell.worker.msg_buffer_emitter.connect(self.decode_id_popup.on_msgs)
 
         if self.decode_id_popup.exec_() == QDialog.Accepted:
@@ -145,7 +146,7 @@ class CanTable(QWidget):
             self._build_ui()
 
     def on_click_edit_encoding_btn(self, msg: Message):
-        pass
+        self.decode_id_popup = DecodeIdPopup(msg=msg, can_db=self.can_db)
 
     def on_msgs(self, msgs: list[Message]):
         can_ids_to_update = set(msg.arbitration_id for msg in msgs)
