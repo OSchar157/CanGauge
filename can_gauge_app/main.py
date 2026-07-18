@@ -32,16 +32,6 @@ if __name__ == "__main__":
 
     db = cantools.database.Database()
     db.add_dbc_string(open('../subaru_global_TESTING.dbc').read())
-    
-    shell = Shell()
-    gauge_page = GaugePage(can_db=db)
-    can_table = CanTable(on_gauge_requested=gauge_page.add_gauge, can_db=db)
-    can_stream = CanStream(can_db=db)
-
-    shell.add_page("gauge", gauge_page)
-    shell.add_page("cantable", can_table)
-    shell.add_page("canstream", can_stream)
-    shell.show_page("canstream")
 
     if len(sys.argv) == 1:
         worker = init_interface()
@@ -53,14 +43,19 @@ if __name__ == "__main__":
         print("usage: python main.py ['test'] [100]")
         sys.exit(1)
     
-    worker.msg_buffer_emitter.connect(gauge_page.on_msgs)
-    worker.msg_buffer_emitter.connect(can_table.on_msgs)
-    worker.msg_buffer_emitter.connect(can_table.decode_id_popup.on_msgs)
-    worker.msg_buffer_emitter.connect(can_stream.on_msgs)
+    shell = Shell(worker)
+    gauge_page = GaugePage(can_db=db)
+    can_table = CanTable(on_gauge_requested=gauge_page.add_gauge, can_db=db)
+    can_stream = CanStream(can_db=db)
+
+    shell.add_page("gauge", gauge_page)
+    shell.add_page("cantable", can_table)
+    shell.add_page("canstream", can_stream)
+    shell.show_page("canstream")
     
     worker.start()
 
-    # shell.showMaximized()
-    shell.setFixedSize(1024, 600)
-    shell.showNormal()
+    shell.showMaximized()
+    # shell.setFixedSize(1024, 600)
+    # shell.showNormal()
     sys.exit(app.exec_())

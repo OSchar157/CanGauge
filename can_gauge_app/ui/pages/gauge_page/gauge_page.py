@@ -14,6 +14,8 @@ from cantools.database import Database
 class GaugePage(QWidget):
     def __init__(self, can_db: Database):
         super().__init__()
+
+        self.shell = None
         
         self.can_db = can_db
 
@@ -25,16 +27,9 @@ class GaugePage(QWidget):
 
         self.gauges: dict[int, dict[str, list[Gauge]]] = {}
 
-        self.able_to_save = False
-
         self._next_id = 0
 
-        self.recv_msgs: bool = False
-
     def on_msgs(self, msgs: list[Message]):
-        if not self.recv_msgs:
-            return
-        
         if not self.gauges:
             return
 
@@ -79,7 +74,6 @@ class GaugePage(QWidget):
         layout.addWidget(rm_gauge_btn)
 
         self.gauges_layout.addLayout(layout)
-        self.able_to_save = True
 
 class RemoveGaugeBtn(QPushButton):
     def __init__(self, layout, gauge, parent: GaugePage):

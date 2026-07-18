@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from ui.pages.can_table.create_gauge_popup import CreateGaugePopup
 from ui.pages.can_table.decode_id_popup import DecodeIdPopup
-from ui.utils import format_timestamp, get_data_for_gui
+from ui.utils import format_timestamp, format_data
 
 from cantools.database import Database
 from can import Message
@@ -15,15 +15,16 @@ class CanTable(QWidget):
     def __init__(self, on_gauge_requested, can_db: Database, parent=None):
         super().__init__(parent)
 
+        self.shell = None
+
         self.on_gauge_requested = on_gauge_requested
         self.can_db = can_db
 
-        temp_decode_ppopup = DecodeIdPopup()
-        self.decode_id_popup = temp_decode_ppopup
-
+        self.decode_id_popup = None
         self.create_gauge_popup = None
 
-        self.recv_msgs: bool = False
+        self._current_sort_col = 2  # Default to ID column matching your initial setup
+        self._current_sort_order = Qt.AscendingOrder
 
         self._build_ui()
 
@@ -36,13 +37,35 @@ class CanTable(QWidget):
         self.tree = QTreeWidget()
         self.tree.setColumnCount(6)
         self.tree.setHeaderLabels(["Timestamp", "Interface", "ID", "Data Len", "Name", "Data"])
-        self.tree.setSortingEnabled(True)
-        self.tree.sortItems(2, Qt.AscendingOrder)
+        self.tree.setSortingEnabled(False)
+        # self.tree.sortItems(2, Qt.AscendingOrder)
         layout.addWidget(self.tree)
+
+        table_header = self.tree.header()
+        table_header.setSectionsClickable(True)
+        table_header.sectionClicked.connect(self._manual_sort_table)
 
         self.tree.collapseAll()
 
         self.can_ids_seen: dict[int, QWidget] = {}
+
+    def _manual_sort_table(self, col: int):
+        # 1. Flip order if clicking the same column, otherwise default to Ascending
+        if self._current_sort_col == col:
+            if self._current_sort_order == Qt.AscendingOrder:
+                self._current_sort_order = Qt.DescendingOrder
+            else:
+                self._current_sort_order = Qt.AscendingOrder
+        else:
+            self._current_sort_col = col
+            self._current_sort_order = Qt.AscendingOrder
+            
+        # 2. Force the header triangle icon to match your tracked state
+        table_header = self.tree.header()
+        table_header.setSortIndicator(self._current_sort_col, self._current_sort_order)
+        
+        # 3. Fire the single manual sort execution pass
+        self.tree.sortItems(self._current_sort_col, self._current_sort_order)
 
     def add_row(self, raw_msg: Message, msg_name: str, id_is_decodable: bool):
         can_id = raw_msg.arbitration_id
@@ -107,26 +130,26 @@ class CanTable(QWidget):
         self.create_gauge_popup.exec()
 
     def on_click_decode_btn(self, msg: Message):
-        self.decode_id_popup.can_id = msg.arbitration_id
-        self.decode_id_popup.data_len = msg.dlc
-        self.decode_id_popup.is_extended_id = msg.is_extended_id
-        self.decode_id_popup.can_db = self.can_db
-        self.decode_id_popup.recv_msgs = True
-        self.decode_id_popup.build_ui()
+        self.decode_id_popup = DecodeIdPopup(can_id=msg.arbitration_id, data_len=msg.dlc,
+                                             is_extended=msg.is_extended_id, can_db=self.can_db)
+        self.shell.worker.msg_buffer_emitter.connect(self.decode_id_popup.on_msgs)
 
         if self.decode_id_popup.exec_() == QDialog.Accepted:
-            self.decode_id_popup.destroy_ui()
+            self.shell.worker.msg_buffer_emitter.disconnect(self.decode_id_popup.on_msgs)
+            self.decode_id_popup = None
             self._build_ui()
 
     def on_msgs(self, msgs: list[Message]):
-        if not self.recv_msgs:
-            return
-        
         can_ids_to_update = set(msg.arbitration_id for msg in msgs)
         new_can_ids = can_ids_to_update.difference(self.can_ids_seen)
 
-        self.setUpdatesEnabled(False)
-        self.tree.setSortingEnabled(False)
+        self.tree.setUpdatesEnabled(False)
+
+        db_get_msg = self.can_db.get_message_by_frame_id
+        fmt_ts = format_timestamp
+        fmt_data = format_data
+        fmt_sig = format_signal_value
+        ids_seen = self.can_ids_seen
 
         for msg in reversed(msgs):
             if not can_ids_to_update:
@@ -137,8 +160,9 @@ class CanTable(QWidget):
                 continue
 
             try:
-                decoded_msg_signals = self.can_db.decode_message(can_id, msg.data)
-                msg_name = self.can_db.get_message_by_frame_id(can_id).name
+                db_msg = db_get_msg(can_id)
+                decoded_msg_signals = db_msg.decode(msg.data)
+                msg_name = db_msg.name
                 is_decodable = True
             except KeyError:
                 msg_name = ""
@@ -147,24 +171,21 @@ class CanTable(QWidget):
             if can_id in new_can_ids:
                 self.add_row(msg, msg_name, is_decodable)
 
-            ts, _, _, _, data = get_data_for_gui(msg)
-        
-            item = self.can_ids_seen[can_id]
-            item.setText(0, ts)
-            item.setText(5, data)
+            item = ids_seen[can_id]
+            item.setText(0, fmt_ts(msg.timestamp))
+            item.setText(5, fmt_data(msg.data))
 
             can_ids_to_update.discard(can_id)
 
             if not is_decodable:
                 continue
 
+            signal_labels = item.signal_labels
             for sig_name, sig_val in decoded_msg_signals.items():
-                if sig_name in item.signal_labels:
-                    item.signal_labels[sig_name].setText(format_signal_value(sig_val))
+                if sig_name in signal_labels:
+                    signal_labels[sig_name].setText(fmt_sig(sig_val))
     
-        self.tree.setSortingEnabled(True)
-        self.setUpdatesEnabled(True)
-
+        self.tree.setUpdatesEnabled(True)
 
 def format_signal_value(value):
     if isinstance(value, float):

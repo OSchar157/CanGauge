@@ -2,8 +2,10 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton
 from PyQt5.QtCore import Qt
 
 class SideMenu(QWidget):
-    def __init__(self, parent=None, width=220):
+    def __init__(self, button_labels: list[str], parent=None, width=220):
         super().__init__(parent)
+        self.button_labels = button_labels
+        
         self.setFixedWidth(width)
         self.setStyleSheet("background-color: #1a1b1f;")
 
@@ -16,7 +18,7 @@ class SideMenu(QWidget):
         layout.addWidget(title)
 
         self.buttons = {}
-        for label in ["Gauge Display", "Can Table", "Can Stream", "Exit"]:
+        for label in self.button_labels:
             btn = QPushButton(label)
             btn.setStyleSheet("color: white; text-align: left; padding: 10px; border: none;")
             btn.setCursor(Qt.PointingHandCursor)

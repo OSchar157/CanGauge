@@ -12,6 +12,8 @@ from cantools.database import Message, Signal, Database, Message
 from cantools.database.conversion import BaseConversion
 from cantools.database.can.signal import NamedSignalValue
 
+from ui.utils import format_data
+
 MIN_SIGNAL_ROWS = 1
 
 ORDER_OPTS = ["Little Endian", "Big Endian"]
@@ -30,13 +32,12 @@ class DecodeIdPopup(QDialog):
         self.is_extended = is_extended
         self.can_db = can_db
 
-        self.recv_msgs = False
-    
-    def build_ui(self):
         self.setWindowTitle(f"Decode CAN ID: {self.can_id}")
 
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
+
+        self._init_data_preview_section()
 
         self.main_layout.addWidget(QLabel("Can Message:"))
 
@@ -54,10 +55,27 @@ class DecodeIdPopup(QDialog):
         btn_layout.addWidget(self.close_btn)
 
         self.main_layout.addLayout(btn_layout)
+    
+    def _init_data_preview_section(self):
+        self.msg_data_layout = QVBoxLayout()
+        self.msg_data_layout.addWidget(QLabel("Data Preview:"))
 
-    def destroy_ui(self):
-        self.recv_msgs = False
-        self.main_layout = None
+        hex_layout = QHBoxLayout()
+        hex_layout.addWidget(QLabel("Raw Hex:"))
+        self.msg_hex_data_label = QLabel("")
+        hex_layout.addWidget(self.msg_hex_data_label)
+        self.msg_data_layout.addLayout(hex_layout)
+        
+        self.msg_bit_data_labels = [QLabel() for _ in range(self.data_len)]
+
+        for i, w in enumerate(self.msg_bit_data_labels):
+            layout = QHBoxLayout()
+            layout.addWidget(QLabel(f"Byte {i}:"))
+            layout.addWidget(w)
+            self.msg_data_layout.addLayout(layout)
+
+        self.main_layout.addLayout(self.msg_data_layout)
+
     
     def _get_signal_from_table_row(self, row: int, is_test: bool):
         for col in range(self.signals_table.columnCount()):
@@ -69,11 +87,6 @@ class DecodeIdPopup(QDialog):
                 text = widget.text()
             
             col_header = self.signals_table.horizontalHeaderItem(col).text()
-
-            if not is_test:
-                if widget is None or text == "":
-                    QMessageBox.critical(None, "Error", "Ayy cuh you done f'ed up. You ain't done filled e'rthing out.")
-                    return
 
             if col_header == "Name":
                 name = text
@@ -119,19 +132,32 @@ class DecodeIdPopup(QDialog):
         return signal
 
     def _on_click_save_btn(self):
+        name = self.name_line_edit.text()
+        if name == "":
+            QMessageBox.critical(None, "Error", f"Please populate the 'Name' feild.")
+            return
+        
         new_signals = []
         for row in range(self.signals_table.rowCount()):
-            signal = self._get_signal_from_table_row(row, is_test=False)
-            new_signals.append(signal)
-
-        new_message = Message(
-            frame_id= self.can_id,
-            name=self.name_line_edit.text(),
-            length=self.data_len,
-            signals=new_signals,
-            is_extended_frame=False,
-            comment="Added via GUI",
-        )
+            try:
+                signal = self._get_signal_from_table_row(row, is_test=False)
+                new_signals.append(signal)
+            except:
+                QMessageBox.critical(None, "Error", f"There is a problem with row: {row}. Ensure all fields are populated.")
+                return
+        
+        try:
+            new_message = Message(
+                frame_id= self.can_id,
+                name=name,
+                length=self.data_len,
+                signals=new_signals,
+                is_extended_frame=False,
+                comment="Added via GUI",
+            )
+        except Exception as e:
+            QMessageBox.critical(None, "Error", f"There is a problem with the signals.\n{e}")
+            return
 
         self.can_db.messages.append(new_message)
         self.can_db.refresh()
@@ -252,9 +278,6 @@ class DecodeIdPopup(QDialog):
         signal_val_widget.setText(new_val)
 
     def on_msgs(self, msgs: list[Message]):
-        if not self.recv_msgs:
-            return
-        
         if not msgs:
             return
         
@@ -262,8 +285,16 @@ class DecodeIdPopup(QDialog):
             if msg.arbitration_id != self.can_id:
                 continue
 
+            msg_data = msg.data
+            self.msg_hex_data_label.setText(format_data(msg_data))
+
+            for byte_i, bit_data_label in enumerate(self.msg_bit_data_labels):
+                bit_data_label.setText(f"{msg_data[byte_i]:08b}")
+
             for row in range(self.signals_table.rowCount()):
                 self._update_signal_row_val(row, msg)
+
+            break
 
     def remove_selected_row(self):
         row = self.signals_table.currentRow()
