@@ -12,7 +12,7 @@ from cantools.database import Message, Signal, Database, Message
 from cantools.database.conversion import BaseConversion
 from cantools.database.can.signal import NamedSignalValue
 
-from ui.utils import format_data
+from ui.utils import format_data, dec_to_hex
 
 MIN_SIGNAL_ROWS = 1
 
@@ -32,7 +32,7 @@ class DecodeIdPopup(QDialog):
         self.is_extended = is_extended
         self.can_db = can_db
 
-        self.setWindowTitle(f"Decode CAN ID: {self.can_id}")
+        self.setWindowTitle(f"Decode CAN ID: {dec_to_hex(self.can_id)}")
 
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
@@ -177,7 +177,7 @@ class DecodeIdPopup(QDialog):
         #### CAN ID
         canid_layout = QVBoxLayout()
         canid_layout.addWidget(QLabel("CAN ID"))
-        self.canid_line_edit = QLineEdit(str(self.can_id))
+        self.canid_line_edit = QLineEdit(dec_to_hex(self.can_id))
         self.canid_line_edit.setReadOnly(True)
         canid_layout.addWidget(self.canid_line_edit)
         can_msg_table_layout.addLayout(canid_layout)

@@ -7,10 +7,13 @@ def format_timestamp(timestamp: float):
 def format_data(data: bytearray):
     return " ".join(f"{byte:02X}" for byte in data)
 
+def dec_to_hex(hex: str):
+    return f"{hex:02X}"
+
 def get_data_for_gui(msg: Message):
     ts = format_timestamp(msg.timestamp)
     channel = str(msg.channel)
-    can_id = f"{msg.arbitration_id:02X}"
+    can_id = dec_to_hex(msg.arbitration_id)
     dlc_str = f"[{msg.dlc}]"
     data = format_data(msg.data)
 

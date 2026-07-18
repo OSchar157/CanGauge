@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QWidget, QVBoxLayout,
     QPushButton, QLabel, QFormLayout, QHeaderView,
-    QDialog
+    QDialog, QHBoxLayout
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from ui.pages.can_table.create_gauge_popup import CreateGaugePopup
@@ -109,16 +109,21 @@ class CanTable(QWidget):
 
         layout.addLayout(signals_form)
 
-        create_gauge_btn = QPushButton("Create Gauge")
+        btn_layout = QHBoxLayout()
 
+        create_gauge_btn = QPushButton("Create Gauge")
         can_msg_name = self.can_db.get_message_by_frame_id(can_id).name
         signal_names = [signal.name for signal in signals]
-
         create_gauge_btn.clicked.connect(
             lambda checked,i=can_id, n=can_msg_name, s=signal_names: self.on_click_create_gauge_btn(i, n, s)
         )
+        btn_layout.addWidget(create_gauge_btn)
 
-        layout.addWidget(create_gauge_btn)
+        edit_encoding_btn = QPushButton("Edit Encoding")
+        edit_encoding_btn.clicked.connect(self.on_click_edit_encoding_btn)
+        btn_layout.addWidget(edit_encoding_btn)
+
+        layout.addLayout(btn_layout)
 
     def _build_decode_section(self, layout: QVBoxLayout, msg: Message):
         decode_btn = QPushButton("Decode")
@@ -138,6 +143,9 @@ class CanTable(QWidget):
             self.shell.worker.msg_buffer_emitter.disconnect(self.decode_id_popup.on_msgs)
             self.decode_id_popup = None
             self._build_ui()
+
+    def on_click_edit_encoding_btn(self, msg: Message):
+        pass
 
     def on_msgs(self, msgs: list[Message]):
         can_ids_to_update = set(msg.arbitration_id for msg in msgs)
