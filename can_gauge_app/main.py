@@ -31,7 +31,6 @@ if __name__ == "__main__":
     app.setDesktopFileName("CanGauge")
 
     db = cantools.database.Database()
-    db.add_dbc_string(open('../subaru_global_TESTING.dbc').read())
 
     if len(sys.argv) == 1:
         worker = init_interface()
@@ -42,6 +41,11 @@ if __name__ == "__main__":
     else:
         print("usage: python main.py ['test'] [100]")
         sys.exit(1)
+
+    if sys.argv[1] == "test":
+        db.add_dbc_string(open('../subaru_global_TESTING.dbc').read())
+    else:
+        db.add_dbc_string(open('../Orion_CANBUS.dbc').read())
     
     shell = Shell(worker)
     gauge_page = GaugePage(can_db=db)
