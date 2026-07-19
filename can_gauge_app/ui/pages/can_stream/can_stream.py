@@ -34,7 +34,7 @@ class CanStream(QtWidgets.QPlainTextEdit):
         self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         self.viewport().setCursor(Qt.CursorShape.ArrowCursor)
 
-        self.setFont(QtGui.QFont(MONO, 19))
+        self.setFont(QtGui.QFont(MONO, 13))
         self.setStyleSheet(f"""
             QPlainTextEdit {{
                 background-color: {BG};

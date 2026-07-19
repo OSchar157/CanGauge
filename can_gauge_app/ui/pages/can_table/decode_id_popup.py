@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QGridLayout,
     QLineEdit, QComboBox, QPushButton, QLabel, QDialog,
     QHBoxLayout, QBoxLayout, QTableWidget, QHeaderView,
-    QMessageBox
+    QMessageBox, QScrollArea
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
@@ -62,24 +62,33 @@ class DecodeIdPopup(QDialog):
         self.main_layout.addLayout(btn_layout)
     
     def _init_data_preview_section(self):
-        self.msg_data_layout = QVBoxLayout()
-        self.msg_data_layout.addWidget(QLabel("Data Preview:"))
+        section_layout = QVBoxLayout()
+        section_layout.addWidget(QLabel("Data Preview:"))
 
         hex_layout = QHBoxLayout()
         hex_layout.addWidget(QLabel("Raw Hex:"))
         self.msg_hex_data_label = QLabel("")
         hex_layout.addWidget(self.msg_hex_data_label)
-        self.msg_data_layout.addLayout(hex_layout)
+        section_layout.addLayout(hex_layout)
         
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
+        scroll_container = QWidget()
+        bytes_layout = QVBoxLayout(scroll_container)
+
         self.msg_bit_data_labels = [QLabel() for _ in range(self.data_len)]
-
         for i, w in enumerate(self.msg_bit_data_labels):
-            layout = QHBoxLayout()
-            layout.addWidget(QLabel(f"Byte {i}:"))
-            layout.addWidget(w)
-            self.msg_data_layout.addLayout(layout)
+            row_layout = QHBoxLayout()
+            row_layout.addWidget(QLabel(f"Byte {i}:"))
+            row_layout.addWidget(w)
+            bytes_layout.addLayout(row_layout)
 
-        self.main_layout.addLayout(self.msg_data_layout)
+        scroll_area.setWidget(scroll_container)
+        section_layout.addWidget(scroll_area)
+
+        self.main_layout.addLayout(section_layout)
+
 
     def _get_signal_from_table_row(self, row: int, is_test: bool):
         for col in range(self.signals_table.columnCount()):
