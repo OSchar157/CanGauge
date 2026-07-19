@@ -136,8 +136,8 @@ class CanTable(QWidget):
         self.create_gauge_popup = CreateGaugePopup(self, can_id, can_msg_name, signal_names, self.on_gauge_requested)
         self.create_gauge_popup.exec()
 
-    def on_click_decode_btn(self, msg: Message):
-        self.decode_id_popup = DecodeIdPopup(msg=msg, can_db=self.can_db)
+    def on_click_decode_btn(self, raw_msg: Message):
+        self.decode_id_popup = DecodeIdPopup(raw_msg=raw_msg, can_db=self.can_db)
         self.shell.worker.msg_buffer_emitter.connect(self.decode_id_popup.on_msgs)
 
         if self.decode_id_popup.exec_() == QDialog.Accepted:

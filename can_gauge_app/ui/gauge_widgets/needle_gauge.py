@@ -97,6 +97,7 @@ class NeedleGauge(Gauge):
         self._draw_ticks(painter)
         self._draw_labels(painter)
         self._draw_unit(painter)
+        self._draw_label(painter)
         self._draw_needle(painter)
         self._draw_center_cap(painter)
 
@@ -191,7 +192,6 @@ class NeedleGauge(Gauge):
 
             painter.setPen(QPen(color))
 
-            # label = str(val // 1000) if self.max_val >= 1000 else str(val)
             label = str(val)
             painter.drawText(
                 QPointF(x - 5, y + 4),
@@ -204,6 +204,11 @@ class NeedleGauge(Gauge):
         painter.setFont(font)
         painter.drawText(-20, 55, 40, 12, Qt.AlignCenter, self.unit)
 
+    def _draw_label(self, painter: QPainter):
+        painter.setPen(QColor("#cccccc"))
+        font = QFont("Courier New", 6, QFont.Bold)
+        painter.setFont(font)
+        painter.drawText(-20, 65, 40, 12, Qt.AlignCenter, self.label)
 
     def _draw_needle(self, painter):
         frac = (self._value - self.min_val) / (self.max_val - self.min_val)
