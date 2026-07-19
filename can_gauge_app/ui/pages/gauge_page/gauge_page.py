@@ -94,10 +94,11 @@ class RemoveGaugeBtn(QPushButton):
         self.parent.gauges_layout.removeItem(self.gauge_layout)
         self.gauge_layout.deleteLater()
 
-        for gauges in self.parent.gauges.values():
-            if self.gauge in gauges:
-                gauges.remove(self.gauge)
-                break
+        for sig_name_gauge_list_dict in self.parent.gauges.values():
+            for gauges in sig_name_gauge_list_dict.values():
+                if self.gauge in gauges:
+                    gauges.remove(self.gauge)
+                    break
 
     def _clear_layout(self, layout):
         while layout.count():
