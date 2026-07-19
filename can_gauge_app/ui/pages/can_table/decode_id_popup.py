@@ -8,9 +8,12 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
 
+import cantools.database
 from cantools.database import Message, Signal, Database, Message
 from cantools.database.conversion import BaseConversion
 from cantools.database.can.signal import NamedSignalValue
+
+import app_state
 
 from ui.utils import format_data, dec_to_hex
 
@@ -182,6 +185,9 @@ class DecodeIdPopup(QDialog):
 
         self.can_db.messages.append(new_message)
         self.can_db.refresh()
+
+        if not app_state.demo_mode:
+            cantools.database.dump_file(self.can_db, f'../{app_state.dbc_path()}')
 
         self.accept()
 

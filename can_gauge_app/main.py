@@ -10,7 +10,9 @@ from ui.pages.gauge_page.gauge_page import GaugePage
 from ui.pages.can_table.can_table import CanTable
 from ui.pages.can_stream.can_stream import CanStream
 
-bitrate = 500000
+import app_state
+
+bitrate = 250000
 using_can0 = True
 
 def init_interface() -> CANWorker:
@@ -30,20 +32,22 @@ if __name__ == "__main__":
     app.setApplicationName("CanGauge") 
     app.setDesktopFileName("CanGauge")
 
-    db = cantools.database.Database()
-
     if len(sys.argv) == 1:
-        db.add_dbc_string(open('../Orion_CANBUS.dbc').read())
+        app_state.demo_mode = False
         worker = init_interface()
     elif len(sys.argv) == 2 and sys.argv[1] == "test":
-        db.add_dbc_string(open('../subaru_global_TESTING.dbc').read())
+        app_state.demo_mode = True
         worker = DemoCANWoker()
     elif len(sys.argv) == 3 and sys.argv[1] == "test" and int(sys.argv[2]) >= 100:
-        db.add_dbc_string(open('../subaru_global_TESTING.dbc').read())
+        app_state.demo_mode = True
         worker = DemoCANWoker(msg_interval=int(sys.argv[2]))
     else:
         print("usage: python main.py ['test'] [100]")
         sys.exit(1)
+
+    db = cantools.database.Database()
+    dbc_path = app_state.dbc_path()
+    db.add_dbc_string(open(f'../{dbc_path}').read())
     
     shell = Shell(worker)
     gauge_page = GaugePage(can_db=db)
