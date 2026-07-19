@@ -4,8 +4,6 @@ from PyQt5.QtCore import Qt
 from can_worker.worker import CANWorker
 from .side_menu import SideMenu
 
-from ui.keyboard import VirtualKeyboard
-
 BUTTON_LABELS = ["Gauge Display", "Can Table", "Can Stream", "Exit"]
 
 class Shell(QWidget):
