@@ -33,19 +33,17 @@ if __name__ == "__main__":
     db = cantools.database.Database()
 
     if len(sys.argv) == 1:
+        db.add_dbc_string(open('../Orion_CANBUS.dbc').read())
         worker = init_interface()
     elif len(sys.argv) == 2 and sys.argv[1] == "test":
+        db.add_dbc_string(open('../subaru_global_TESTING.dbc').read())
         worker = DemoCANWoker()
     elif len(sys.argv) == 3 and sys.argv[1] == "test" and int(sys.argv[2]) >= 100:
+        db.add_dbc_string(open('../subaru_global_TESTING.dbc').read())
         worker = DemoCANWoker(msg_interval=int(sys.argv[2]))
     else:
         print("usage: python main.py ['test'] [100]")
         sys.exit(1)
-
-    if sys.argv[1] == "test":
-        db.add_dbc_string(open('../subaru_global_TESTING.dbc').read())
-    else:
-        db.add_dbc_string(open('../Orion_CANBUS.dbc').read())
     
     shell = Shell(worker)
     gauge_page = GaugePage(can_db=db)
