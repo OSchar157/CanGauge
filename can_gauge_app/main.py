@@ -61,7 +61,8 @@ if __name__ == "__main__":
     
     worker.start()
 
-    shell.showMaximized()
+    # shell.showMaximized()
+    shell.showFullScreen()
     # shell.setFixedSize(1024, 600)
     # shell.showNormal()
     sys.exit(app.exec_())
