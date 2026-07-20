@@ -187,7 +187,7 @@ class BarGauge(Gauge):
 
         painter.setFont(self._value_font)
         painter.setPen(self._zone_color(self._value))
-        painter.drawText(0, y, W, value_h, Qt.AlignCenter, f"{self._value:.0f}")
+        painter.drawText(0, y, W, value_h, Qt.AlignCenter, f"{self._value:.3f}")
 
         painter.setFont(self._unit_font)
         painter.setPen(UNIT_COLOR)
