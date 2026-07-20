@@ -33,10 +33,6 @@ class GaugePage(QWidget):
         self.gauges_layout = QGridLayout()
         master.addLayout(self.gauges_layout, 1)  # stretch=1 -> grid gets all the space
 
-        save_btn = QPushButton("Save")
-        save_btn.clicked.connect(self.save_gauges)
-        master.addWidget(save_btn)
-
         # fast lookup for on_msgs: can_id -> sig_name -> [Gauge, ...]
         self.gauges: dict[int, dict[str, list[Gauge]]] = {}
 

@@ -30,9 +30,14 @@ class Shell(QWidget):
         self.side_menu.buttons["Gauge Display"].clicked.connect(lambda: self.show_page("gauge"))
         self.side_menu.buttons["Can Table"].clicked.connect(lambda: self.show_page("cantable"))
         self.side_menu.buttons["Can Stream"].clicked.connect(lambda: self.show_page("canstream"))
-        self.side_menu.buttons["Exit"].clicked.connect(QApplication.quit)
+        self.side_menu.buttons["Exit"].clicked.connect(self.exit_pressed)
 
         self._page_index = {}
+
+    def exit_pressed(self):
+        idx = self._page_index["gauge"]
+        self.pages.widget(idx).save_gauges()
+        QApplication.quit()
     
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
