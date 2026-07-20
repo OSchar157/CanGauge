@@ -1,41 +1,61 @@
 import sys
 import math
-from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QVBoxLayout, QLabel
-from PyQt5.QtCore import Qt, QTimer, QRectF
-from PyQt5.QtGui import QPainter, QColor, QPen, QFont, QLinearGradient
 
-from ui.gauge_widgets.gauge import Gauge, ParamSpec
+from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QSizePolicy
+from PyQt5.QtCore import Qt, QTimer, QRectF, QSize
+from PyQt5.QtGui import QPainter, QColor, QPen, QFont, QFontMetrics
 
-WARNING_COLOR  = QColor("#E8A020")
-DANGER_COLOR   = QColor("#CC2200")
-SAFE_COLOR     = QColor("#1D9E75")
-EMPTY_COLOR    = QColor("#2a2a2a")
-TICK_COLOR     = QColor("#555555")
-LABEL_COLOR    = QColor("#aaaaaa")
-UNIT_COLOR     = QColor("#E8A020")
+from ui.gauge_widgets.gauge import Gauge
 
-NUM_TICKS = 5          # Number of tick marks on the side scale
-SEGMENT_GAP = 3        # px gap between bar segments
-NUM_SEGMENTS = 100      # Total stacked segments
+# ── Colors ────────────────────────────────────────────────────────────────────
+WARNING_COLOR = QColor("#E8A020")
+DANGER_COLOR  = QColor("#CC2200")
+SAFE_COLOR    = QColor("#1D9E75")
+EMPTY_COLOR   = QColor("#2a2a2a")
+TICK_COLOR    = QColor("#555555")
+LABEL_COLOR   = QColor("#aaaaaa")
+UNIT_COLOR    = QColor("#E8A020")
 
-# TODO: create better the value updates to have 'confidency zones' so that the gauge doesnt flicker when value is on the edge
+# ── Layout ────────────────────────────────────────────────────────────────────
+MIN_WIDTH  = 120     # width constraints keep the gauge at a sensible size
+MAX_WIDTH  = 600     # instead of stretching across the whole layout
+MIN_HEIGHT = 240
+
+ZONE_PAD      = 8    # vertical padding between label / bar / value zones
+TICK_LEN      = 6    # length of the tick marks
+TICK_TEXT_PAD = 6    # gap between tick label text and the tick mark
+
+NUM_TICKS    = 5     # number of tick intervals on the side scale
+NUM_SEGMENTS = 100   # total stacked segments
+SEGMENT_GAP  = 3     # px gap between segments (shrinks automatically if tight)
+
+# ── Fonts ─────────────────────────────────────────────────────────────────────
+FONT_FAMILY     = "Courier New"
+LABEL_FONT_SIZE = 16
+TICK_FONT_SIZE  = 13
+VALUE_FONT_SIZE = 22
+UNIT_FONT_SIZE  = 12
+
+# TODO: create better the value updates to have 'confidency zones' so that the
+# gauge doesnt flicker when value is on the edge
+
 
 class BarGauge(Gauge):
     """
     Reusable vertical bar-graph gauge.
 
     args:
-        min_val         (float):    minimum value on the gauge
-        max_val         (float):    maximum value on the gauge
-        warn_low        (float):    value where low warning zone ends
-        warn_high       (float):    value where high warning zone begins
-        danger_low      (float):    value where low danger zone ends
-        danger_high     (float):    value where high danger zone begins
-        untit           (str):      units of the value
-        label           (str):      optional text field
+        min_val     (float): minimum value on the gauge
+        max_val     (float): maximum value on the gauge
+        warn_low    (float): value where low warning zone ends
+        warn_high   (float): value where high warning zone begins
+        danger_low  (float): value where low danger zone ends
+        danger_high (float): value where high danger zone begins
+        unit        (str):   units of the value
+        label       (str):   optional text field
     """
     name = "Bar Gauge"
-    
+
     def __init__(self,
                  val_offset=0,
                  val_scale=1,
@@ -49,13 +69,25 @@ class BarGauge(Gauge):
                  label="Gas",
                  parent=None
             ):
-        
-        super().__init__(val_offset, val_scale, min_val, max_val, 
+
+        super().__init__(val_offset, val_scale, min_val, max_val,
                          warn_low, warn_high, danger_low, danger_high,
                          unit, label, parent)
 
-    def to_json(self):
-        return super().to_json()
+        # Keep the gauge from stretching across the whole layout: it may grow
+        # vertically, but its width stays within a fixed band.
+        self.setMinimumSize(MIN_WIDTH, MIN_HEIGHT)
+        self.setMaximumWidth(MAX_WIDTH)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+
+        self._label_font = QFont(FONT_FAMILY, LABEL_FONT_SIZE, QFont.Bold)
+        self._tick_font  = QFont(FONT_FAMILY, TICK_FONT_SIZE)
+        self._value_font = QFont(FONT_FAMILY, VALUE_FONT_SIZE, QFont.Bold)
+        self._unit_font  = QFont(FONT_FAMILY, UNIT_FONT_SIZE, QFont.Bold)
+
+    def sizeHint(self):
+        return QSize(MAX_WIDTH, 500)
+
     # ── Painting ──────────────────────────────────────────────────────────────
 
     def paintEvent(self, event):
@@ -64,95 +96,118 @@ class BarGauge(Gauge):
 
         W, H = self.width(), self.height()
 
-        # Layout zones
-        label_h   = 22
-        value_h   = 28
-        unit_h    = 18
-        tick_w    = 28    # side tick + label column
-        bar_margin_top    = label_h + 8
-        bar_margin_bottom = value_h + unit_h + 8
-        bar_x     = tick_w
-        bar_w     = W - tick_w - 10
-        bar_y     = bar_margin_top
-        bar_h     = H - bar_margin_top - bar_margin_bottom
+        fm_label = QFontMetrics(self._label_font)
+        fm_tick  = QFontMetrics(self._tick_font)
+        fm_value = QFontMetrics(self._value_font)
+        fm_unit  = QFontMetrics(self._unit_font)
+
+        # Vertical layout: label on top, value + unit at the bottom, bar
+        # filling whatever is left in between.
+        label_h = fm_label.height() if self.label else 0
+        value_h = fm_value.height()
+        unit_h  = fm_unit.height()
+
+        bar_y      = label_h + max(ZONE_PAD, fm_tick.height() // 2)
+        bar_bottom = H - (value_h + unit_h + ZONE_PAD + 2)
+        bar_h      = bar_bottom - bar_y
+
+        # Horizontal layout: the tick column is sized to fit the widest tick
+        # label, and is mirrored by an equal empty margin on the right, so the
+        # bar sits dead-center in the widget on the same axis as the label,
+        # value, and unit text.
+        tick_col_w = self._tick_column_width(fm_tick)
+        bar_x = tick_col_w
+        bar_w = W - 2 * tick_col_w
 
         self._draw_label(painter, W, label_h)
-        self._draw_bar(painter, bar_x, bar_y, bar_w, bar_h)
-        self._draw_ticks(painter, tick_w, bar_y, bar_h)
-        self._draw_value(painter, W, H - bar_margin_bottom + 6, value_h, unit_h)
+        if bar_w > 0 and bar_h > 0:
+            self._draw_bar(painter, bar_x, bar_y, bar_w, bar_h)
+            self._draw_ticks(painter, fm_tick, tick_col_w, bar_y, bar_h)
+        self._draw_value(painter, W, bar_bottom + ZONE_PAD, value_h, unit_h)
 
     def _draw_label(self, painter, W, label_h):
         if not self.label:
             return
-        font = QFont("Courier New", 8, QFont.Bold)
-        painter.setFont(font)
+        painter.setFont(self._label_font)
         painter.setPen(LABEL_COLOR)
         painter.drawText(0, 0, W, label_h, Qt.AlignCenter, self.label)
 
     def _draw_bar(self, painter, bx, by, bw, bh):
-        """Draw segmented bar fill with zone-aware coloring."""
-        seg_total_h = (bh - SEGMENT_GAP * (NUM_SEGMENTS - 1)) / NUM_SEGMENTS
-        seg_h = max(2, seg_total_h)
+        """Draw the segmented bar fill with zone-aware coloring (i=0 = bottom).
+
+        Each segment owns an equal slot of the bar height and is drawn centered
+        inside it, so segments can never spill outside the bar area no matter
+        how many there are or how small the widget gets.
+        """
+        slot_h = bh / NUM_SEGMENTS
+        gap    = min(SEGMENT_GAP, slot_h * 0.4)   # keep a gap only if it fits
+        seg_h  = slot_h - gap
         radius = seg_h * 0.45
 
-        frac = (self._value - self.min_val) / max(1, self.max_val - self.min_val)
+        span = self.max_val - self.min_val
+        frac = (self._value - self.min_val) / span if span else 0.0
+        frac = max(0.0, min(1.0, frac))
         filled = int(round(frac * NUM_SEGMENTS))
 
+        painter.setPen(Qt.NoPen)
         for i in range(NUM_SEGMENTS):
-            # i=0 is bottom segment
-            seg_frac = i / NUM_SEGMENTS          # value fraction this segment represents
-            seg_val  = self.min_val + seg_frac * (self.max_val - self.min_val)
+            seg_val  = self.min_val + (i / NUM_SEGMENTS) * span
+            slot_top = by + bh - (i + 1) * slot_h
 
-            y = by + bh - (i + 1) * seg_h - i * SEGMENT_GAP
-
-            if i < filled:
-                color = self._zone_color(seg_val)
-            else:
-                color = EMPTY_COLOR
-
-            painter.setPen(Qt.NoPen)
+            color = self._zone_color(seg_val) if i < filled else EMPTY_COLOR
             painter.setBrush(color)
-            rect = QRectF(bx, y, bw, seg_h)
-            painter.drawRoundedRect(rect, radius, radius)
+            painter.drawRoundedRect(
+                QRectF(bx, slot_top + gap / 2, bw, seg_h), radius, radius)
 
-    def _draw_ticks(self, painter, tick_w, by, bh):
+    def _draw_ticks(self, painter, fm, tick_col_w, by, bh):
         """Draw scale ticks and labels on the left."""
-        font = QFont("Courier New", 7)
-        painter.setFont(font)
+        painter.setFont(self._tick_font)
+        text_w = tick_col_w - TICK_TEXT_PAD - TICK_LEN
+        text_h = fm.height()
 
-        for i in range(NUM_TICKS + 1):
-            frac = i / NUM_TICKS
-            val  = self.min_val + frac * (self.max_val - self.min_val)
-            y    = by + bh - frac * bh
+        for i, val in enumerate(self._tick_values()):
+            y = by + bh - (i / NUM_TICKS) * bh
 
             # Tick line
             pen = QPen(TICK_COLOR)
             pen.setWidthF(1.0)
             painter.setPen(pen)
-            painter.drawLine(tick_w - 6, int(y), tick_w - 1, int(y))
+            painter.drawLine(int(tick_col_w - TICK_LEN), int(y),
+                             int(tick_col_w - 1), int(y))
 
             # Label
             painter.setPen(LABEL_COLOR)
-            label = str(int(round(val)))
-            painter.drawText(0, int(y) - 7, tick_w - 8, 14, Qt.AlignRight | Qt.AlignVCenter, label)
+            painter.drawText(0, int(y - text_h / 2), text_w, text_h,
+                             Qt.AlignRight | Qt.AlignVCenter,
+                             self._format_tick(val))
 
     def _draw_value(self, painter, W, y, value_h, unit_h):
         """Draw the numeric readout and unit below the bar."""
-        # Numeric value
-        font = QFont("Courier New", 13, QFont.Bold)
-        painter.setFont(font)
-        color = self._zone_color(self._value)
-        painter.setPen(color)
-        val_text = f"{self._value:.0f}"
-        painter.drawText(0, y, W, value_h, Qt.AlignCenter, val_text)
+        y = int(y)
 
-        # Unit
-        font2 = QFont("Courier New", 7, QFont.Bold)
-        painter.setFont(font2)
+        painter.setFont(self._value_font)
+        painter.setPen(self._zone_color(self._value))
+        painter.drawText(0, y, W, value_h, Qt.AlignCenter, f"{self._value:.0f}")
+
+        painter.setFont(self._unit_font)
         painter.setPen(UNIT_COLOR)
-        painter.drawText(0, y + value_h - 2, W, unit_h, Qt.AlignCenter, self.unit)
+        painter.drawText(0, y + value_h, W, unit_h, Qt.AlignCenter, self.unit)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _tick_values(self):
+        span = self.max_val - self.min_val
+        return [self.min_val + (i / NUM_TICKS) * span
+                for i in range(NUM_TICKS + 1)]
+
+    @staticmethod
+    def _format_tick(val):
+        return str(int(round(val)))
+
+    def _tick_column_width(self, fm):
+        widest = max(fm.horizontalAdvance(self._format_tick(v))
+                     for v in self._tick_values())
+        return widest + TICK_TEXT_PAD + TICK_LEN
 
     def _zone_color(self, val) -> QColor:
         if self.danger_high is not None and val >= self.danger_high:
@@ -199,8 +254,12 @@ class DemoWindow(QWidget):
             unit="°C", label="TEMP",
         )
 
+        # Stretch on both sides keeps the width-capped gauges centered when
+        # the window is wider than they need.
+        layout.addStretch(1)
         for g in (self.battery, self.fuel, self.temp):
             layout.addWidget(g)
+        layout.addStretch(1)
 
         self.setLayout(layout)
 
@@ -227,6 +286,6 @@ class DemoWindow(QWidget):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     win = DemoWindow()
-    win.resize(360, 320)
+    win.resize(640, 400)
     win.show()
     sys.exit(app.exec_())

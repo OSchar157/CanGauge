@@ -1,0 +1,73 @@
+[
+  {
+    "can_id": 314,
+    "sig_name": "FL",
+    "gauge_type": "Speedometer",
+    "gauge_args": {
+      "val_offset": 0.0,
+      "val_scale": 0.621371,
+      "min_val": 0,
+      "max_val": 140,
+      "warn_low": null,
+      "warn_high": null,
+      "danger_low": null,
+      "danger_high": null,
+      "unit": "MPH",
+      "label": "Speedometer",
+      "maj_ticks": 14
+    }
+  },
+  {
+    "can_id": 64,
+    "sig_name": "Engine_RPM",
+    "gauge_type": "EngineSpeedGauge",
+    "gauge_args": {
+      "val_offset": 0.0,
+      "val_scale": 0.001,
+      "min_val": 0,
+      "max_val": 8,
+      "warn_low": null,
+      "warn_high": null,
+      "danger_low": null,
+      "danger_high": 5,
+      "unit": "RPM",
+      "label": "x1000",
+      "maj_ticks": 8
+    }
+  },
+  {
+    "can_id": 2,
+    "sig_name": "Steering_Angle",
+    "gauge_type": "NeedleGauge",
+    "gauge_args": {
+      "val_offset": 0.0,
+      "val_scale": 0.1,
+      "min_val": -420,
+      "max_val": 420,
+      "warn_low": null,
+      "warn_high": null,
+      "danger_low": null,
+      "danger_high": null,
+      "unit": "deg",
+      "label": "Steering Angle",
+      "maj_ticks": 8
+    }
+  },
+  {
+    "can_id": 64,
+    "sig_name": "Engine_RPM",
+    "gauge_type": "BarGauge",
+    "gauge_args": {
+      "val_offset": 0.0,
+      "val_scale": 1.0,
+      "min_val": 0,
+      "max_val": 8000,
+      "warn_low": null,
+      "warn_high": null,
+      "danger_low": null,
+      "danger_high": 6000,
+      "unit": "RPM",
+      "label": "Engine Speed"
+    }
+  }
+]
