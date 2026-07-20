@@ -18,9 +18,9 @@ using_can0 = True
 def init_interface() -> CANWorker:
     bus_name = f"{'can0' if using_can0 else 'can1'}"
 
-    os.system(f'ip link set {bus_name} down')
-    os.system(f'ip link set {bus_name} type can bitrate {bitrate}')
-    os.system(f'ip link set {bus_name} up')
+    os.system(f'sudo ip link set {bus_name} down')
+    os.system(f'sudo ip link set {bus_name} type can bitrate {bitrate}')
+    os.system(f'sudo ip link set {bus_name} up')
 
     bus = can.interface.Bus(channel=bus_name, interface='socketcan')
     worker = CANWorker(bus)
