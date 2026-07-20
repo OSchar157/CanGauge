@@ -1,7 +1,7 @@
 import sys
 import math
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout
-from PyQt5.QtCore import Qt, QTimer, QPointF
+from PyQt5.QtCore import Qt, QTimer, QPointF, QSize
 from PyQt5.QtGui import (
     QPainter, QColor, QPen, QFont
 )
@@ -74,8 +74,8 @@ class NeedleGauge(Gauge):
     
         self.maj_ticks = maj_ticks
 
-    def to_json(self):
-        return super().to_json()
+    def sizeHint(self):
+        return QSize(400, 400)
 
     # ── Painting ──────────────────────────────────────────────────────────────
 

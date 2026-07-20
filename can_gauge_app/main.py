@@ -57,7 +57,7 @@ if __name__ == "__main__":
     shell.add_page("gauge", gauge_page)
     shell.add_page("cantable", can_table)
     shell.add_page("canstream", can_stream)
-    shell.show_page("cantable")
+    shell.show_page("gauge")
     
     worker.start()
 
