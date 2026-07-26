@@ -1,16 +1,14 @@
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QStackedWidget, QApplication, QPushButton
 from PyQt5.QtCore import Qt
 
-from can_worker.worker import CANWorker
+import worker_manager
 from .side_menu import SideMenu
 
 BUTTON_LABELS = ["Gauge Display", "Can Table", "Can Stream", "Exit"]
 
 class Shell(QWidget):
-    def __init__(self, worker: CANWorker, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-
-        self.worker = worker
 
         master = QHBoxLayout(self)
         master.setContentsMargins(0, 0, 0, 0)
@@ -62,16 +60,10 @@ class Shell(QWidget):
             self.side_menu.setVisible(False)
             self.hamburger_btn.setVisible(True)
 
-        try:
-            cur_page = self.pages.currentWidget()
-            self.worker.msg_buffer_emitter.disconnect(cur_page.on_msgs)
-        except TypeError:
-            pass
-
         show_page_index = self._page_index[name]
         show_page_widget = self.pages.widget(show_page_index)
 
-        self.worker.msg_buffer_emitter.connect(show_page_widget.on_msgs)
+        worker_manager.set_owner(show_page_widget, show_page_widget.on_msgs)
         self.pages.setCurrentIndex(show_page_index)
 
         self.side_menu.setVisible(False)

@@ -59,7 +59,7 @@ class DecodeIdPopup(QDialog):
         btn_layout.addWidget(self.save_btn)
 
         self.close_btn = QPushButton("Close")
-        self.close_btn.clicked.connect(self.close)
+        self.close_btn.clicked.connect(self.reject)
         btn_layout.addWidget(self.close_btn)
 
         self.main_layout.addLayout(btn_layout)

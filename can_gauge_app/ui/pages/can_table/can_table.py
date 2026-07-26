@@ -1,12 +1,13 @@
 from PyQt5.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QWidget, QVBoxLayout,
     QPushButton, QLabel, QFormLayout, QHeaderView,
-    QDialog, QHBoxLayout
+    QDialog, QHBoxLayout, QScroller
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from ui.pages.can_table.create_gauge_popup import CreateGaugePopup
 from ui.pages.can_table.decode_id_popup import DecodeIdPopup
 from ui.utils import format_timestamp, format_data
+
+import worker_manager
 
 from cantools.database import Database
 from can import Message
@@ -14,8 +15,6 @@ from can import Message
 class CanTable(QWidget):
     def __init__(self, on_gauge_requested, can_db: Database, parent=None):
         super().__init__(parent)
-
-        self.shell = None
 
         self.on_gauge_requested = on_gauge_requested
         self.can_db = can_db
@@ -38,7 +37,6 @@ class CanTable(QWidget):
         self.tree.setColumnCount(6)
         self.tree.setHeaderLabels(["Timestamp", "Interface", "ID", "Data Len", "Name", "Data"])
         self.tree.setSortingEnabled(False)
-        # self.tree.sortItems(2, Qt.AscendingOrder)
         layout.addWidget(self.tree)
 
         table_header = self.tree.header()
@@ -85,7 +83,7 @@ class CanTable(QWidget):
         if id_is_decodable:
             self._build_signals_section(item, expand_layout, raw_msg)
         else:
-            self._build_decode_section(expand_layout, raw_msg)
+            self._add_decode_btn("Decode", expand_layout, raw_msg)
 
         self.tree.setItemWidget(child, 0, expand_widget)
 
@@ -113,37 +111,24 @@ class CanTable(QWidget):
 
         btn_layout = QHBoxLayout()
 
-        create_gauge_btn = QPushButton("Create Gauge")
-        can_msg_name = self.can_db.get_message_by_frame_id(can_id).name
-        signal_names = [signal.name for signal in signals]
-        create_gauge_btn.clicked.connect(
-            lambda checked,i=can_id, n=can_msg_name, s=signal_names: self.on_click_create_gauge_btn(i, n, s)
-        )
-        btn_layout.addWidget(create_gauge_btn)
-
-        edit_encoding_btn = QPushButton("Edit Encoding")
-        edit_encoding_btn.clicked.connect(lambda checked, m=raw_msg: self.on_click_decode_btn(m))
-        btn_layout.addWidget(edit_encoding_btn)
+        self._add_decode_btn("Edit Decoding", btn_layout, raw_msg)
 
         layout.addLayout(btn_layout)
 
-    def _build_decode_section(self, layout: QVBoxLayout, msg: Message):
-        decode_btn = QPushButton("Decode")
-        decode_btn.clicked.connect(lambda checked, m=msg: self.on_click_decode_btn(m))
-        layout.addWidget(decode_btn)
-        
-    def on_click_create_gauge_btn(self, can_id, can_msg_name, signal_names):
-        self.create_gauge_popup = CreateGaugePopup(self, can_id, can_msg_name, signal_names, self.on_gauge_requested)
-        self.create_gauge_popup.exec()
+    def _add_decode_btn(self, btn_name: str, layout: QVBoxLayout, msg: Message):
+        btn = QPushButton(btn_name)
+        btn.clicked.connect(lambda checked, m=msg: self.on_click_decode_btn(m))
+        layout.addWidget(btn)
 
     def on_click_decode_btn(self, raw_msg: Message):
         self.decode_id_popup = DecodeIdPopup(raw_msg=raw_msg, can_db=self.can_db)
-        self.shell.worker.msg_buffer_emitter.connect(self.decode_id_popup.on_msgs)
+        worker_manager.set_owner(self.decode_id_popup, self.decode_id_popup.on_msgs)
 
         if self.decode_id_popup.exec_() == QDialog.Accepted:
-            self.shell.worker.msg_buffer_emitter.disconnect(self.decode_id_popup.on_msgs)
             self.decode_id_popup = None
             self._build_ui()
+        
+        worker_manager.set_owner(self, self.on_msgs)
 
     def on_click_edit_encoding_btn(self, msg: Message):
         self.decode_id_popup = DecodeIdPopup(msg=msg, can_db=self.can_db)

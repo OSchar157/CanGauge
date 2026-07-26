@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QSizePolicy
 from PyQt5.QtCore import Qt, QTimer, QRectF, QSize
 from PyQt5.QtGui import QPainter, QColor, QPen, QFont, QFontMetrics
 
-from ui.gauge_widgets.gauge import Gauge
+from ui.gauge_widgets.gauge import Gauge, ParamSpec
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 WARNING_COLOR = QColor("#E8A020")
@@ -17,8 +17,7 @@ LABEL_COLOR   = QColor("#aaaaaa")
 UNIT_COLOR    = QColor("#E8A020")
 
 # ── Layout ────────────────────────────────────────────────────────────────────
-MIN_WIDTH  = 120     # width constraints keep the gauge at a sensible size
-MAX_WIDTH  = 600     # instead of stretching across the whole layout
+MIN_WIDTH  = 200     # width constraints keep the gauge at a sensible size
 MIN_HEIGHT = 240
 
 ZONE_PAD      = 8    # vertical padding between label / bar / value zones
@@ -29,6 +28,8 @@ NUM_TICKS    = 5     # number of tick intervals on the side scale
 NUM_SEGMENTS = 100   # total stacked segments
 SEGMENT_GAP  = 3     # px gap between segments (shrinks automatically if tight)
 
+MAX_NUM_DEC = 3
+
 # ── Fonts ─────────────────────────────────────────────────────────────────────
 FONT_FAMILY     = "Courier New"
 LABEL_FONT_SIZE = 16
@@ -36,57 +37,62 @@ TICK_FONT_SIZE  = 13
 VALUE_FONT_SIZE = 22
 UNIT_FONT_SIZE  = 12
 
-# TODO: create better the value updates to have 'confidency zones' so that the
-# gauge doesnt flicker when value is on the edge
 
 
 class BarGauge(Gauge):
-    """
-    Reusable vertical bar-graph gauge.
 
-    args:
-        min_val     (float): minimum value on the gauge
-        max_val     (float): maximum value on the gauge
-        warn_low    (float): value where low warning zone ends
-        warn_high   (float): value where high warning zone begins
-        danger_low  (float): value where low danger zone ends
-        danger_high (float): value where high danger zone begins
-        unit        (str):   units of the value
-        label       (str):   optional text field
-    """
     name = "Bar Gauge"
 
-    def __init__(self,
-                 val_offset=0,
-                 val_scale=1,
-                 min_val=0,
-                 max_val=100,
-                 warn_low=20,
-                 warn_high=None,
-                 danger_low=10,
-                 danger_high=None,
-                 unit="%",
-                 label="Gas",
-                 parent=None
-            ):
+    @classmethod
+    def get_fields(cls) -> list[ParamSpec]:
+        gauge_fields = super().get_fields()
+        
+        return gauge_fields + [ParamSpec("num_dec_places", "Decimal Places", int, 3)]
 
-        super().__init__(val_offset, val_scale, min_val, max_val,
-                         warn_low, warn_high, danger_low, danger_high,
-                         unit, label, parent)
+    def __init__(
+            self,
+            val_offset,
+            val_scale,
+            min_val,
+            max_val,
+            warn_low,
+            warn_high,
+            danger_low,
+            danger_high,
+            unit,
+            label,
+            num_dec_places: int = 3,
+            parent=None
+        ):
+
+        super().__init__(
+            val_offset, 
+            val_scale, 
+            min_val, 
+            max_val,
+            warn_low, 
+            warn_high, 
+            danger_low, 
+            danger_high,
+            unit, 
+            label,
+            parent)
+
+        dec_range = range(MAX_NUM_DEC + 1)
+        if num_dec_places not in dec_range:
+            raise ValueError(f"num_dec_places must be in {dec_range}")
+        
+        self.num_dec_places = num_dec_places
 
         # Keep the gauge from stretching across the whole layout: it may grow
         # vertically, but its width stays within a fixed band.
         self.setMinimumSize(MIN_WIDTH, MIN_HEIGHT)
-        self.setMaximumWidth(MAX_WIDTH)
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
         self._label_font = QFont(FONT_FAMILY, LABEL_FONT_SIZE, QFont.Bold)
         self._tick_font  = QFont(FONT_FAMILY, TICK_FONT_SIZE)
         self._value_font = QFont(FONT_FAMILY, VALUE_FONT_SIZE, QFont.Bold)
         self._unit_font  = QFont(FONT_FAMILY, UNIT_FONT_SIZE, QFont.Bold)
-
-    def sizeHint(self):
-        return QSize(MAX_WIDTH, 500)
 
     # ── Painting ──────────────────────────────────────────────────────────────
 
@@ -179,7 +185,7 @@ class BarGauge(Gauge):
             painter.setPen(LABEL_COLOR)
             painter.drawText(0, int(y - text_h / 2), text_w, text_h,
                              Qt.AlignRight | Qt.AlignVCenter,
-                             self._format_tick(val))
+                             self._format_tick(val, self.num_dec_places))
 
     def _draw_value(self, painter, W, y, value_h, unit_h):
         """Draw the numeric readout and unit below the bar."""
@@ -187,11 +193,12 @@ class BarGauge(Gauge):
 
         painter.setFont(self._value_font)
         painter.setPen(self._zone_color(self._value))
-        painter.drawText(0, y, W, value_h, Qt.AlignCenter, f"{self._value:.0f}")
+        painter.drawText(0, y, W, value_h, Qt.AlignCenter, f"{self._value:.{self.num_dec_places}f}")
 
-        painter.setFont(self._unit_font)
-        painter.setPen(UNIT_COLOR)
-        painter.drawText(0, y + value_h, W, unit_h, Qt.AlignCenter, self.unit)
+        if self.unit:
+            painter.setFont(self._unit_font)
+            painter.setPen(UNIT_COLOR)
+            painter.drawText(0, y + value_h, W, unit_h, Qt.AlignCenter, self.unit)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -201,11 +208,11 @@ class BarGauge(Gauge):
                 for i in range(NUM_TICKS + 1)]
 
     @staticmethod
-    def _format_tick(val):
-        return str(int(round(val)))
+    def _format_tick(val, num_dec_places):
+        return f"{val:.{num_dec_places}f}"
 
     def _tick_column_width(self, fm):
-        widest = max(fm.horizontalAdvance(self._format_tick(v))
+        widest = max(fm.horizontalAdvance(self._format_tick(v, self.num_dec_places))
                      for v in self._tick_values())
         return widest + TICK_TEXT_PAD + TICK_LEN
 

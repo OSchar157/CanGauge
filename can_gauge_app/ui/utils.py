@@ -7,8 +7,11 @@ def format_timestamp(timestamp: float):
 def format_data(data: bytearray):
     return " ".join(f"{byte:02X}" for byte in data)
 
-def dec_to_hex(hex: str):
-    return f"{hex:02X}"
+def dec_to_hex(dec: str):
+    return f"{dec:02X}"
+
+def hex_to_dec(hex_str: str):
+    return int(hex_str, 16)
 
 def get_data_for_gui(msg: Message):
     ts = format_timestamp(msg.timestamp)

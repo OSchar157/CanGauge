@@ -25,7 +25,6 @@ class CanStream(QtWidgets.QPlainTextEdit):
     def __init__(self, can_db: Database):
         super().__init__()
 
-        self.shell = None
         self.can_db = can_db
 
         self.setReadOnly(True)

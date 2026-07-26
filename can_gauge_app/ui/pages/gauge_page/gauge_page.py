@@ -24,7 +24,6 @@ class GaugePage(QWidget):
         super().__init__()
 
         self.shell = None
-
         self.can_db = can_db
 
         master = QVBoxLayout()
