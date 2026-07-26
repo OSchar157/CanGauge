@@ -29,8 +29,8 @@ class GaugeTemplateBox(QFrame):
 
         self.setStyleSheet("""
             GaugeTemplateBox {
-                border: 10px dashed #808080;
-                border-radius: 8px;
+                border: 4px dashed #808080;
+                border-radius: 16px;
                 background: transparent;
             }
 
@@ -109,10 +109,6 @@ class GaugeLayoutPreset(QWidget):
 
         master.addLayout(all_gauges_layout)
 
-        save_btn = QPushButton("Save")
-        save_btn.clicked.connect(self.save_gauges)
-        master.addWidget(save_btn)
-
         self.select_signal_popup = None
 
         self.gauges: dict[int, dict[str, list[Gauge]]] = {}
@@ -149,8 +145,6 @@ class GaugeLayoutPreset(QWidget):
             self.add_gauge(gauge_template_box.slot, can_id, signal_name, gauge_type, gauge_args)
 
         worker_manager.set_owner(self, self.on_msgs)
-
-
 
     def add_gauge(self, slot: int, can_id: int, sig_name: str, gauge_type: type[Gauge], gauge_args: dict):
         box = self.slots[slot]
