@@ -56,9 +56,10 @@ if __name__ == "__main__":
     shell.add_page("gauge", gauge_page)
     shell.add_page("cantable", can_table)
     shell.add_page("canstream", can_stream)
-    shell.show_page("gauge")
+    shell.show_page("cantable")
 
-    shell.showMaximized()
+    shell.showFullScreen()
+    # shell.showMaximized()
     # shell.setFixedSize(1024, 600)
     # shell.showNormal()
     sys.exit(app.exec_())

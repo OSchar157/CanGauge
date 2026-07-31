@@ -4,7 +4,7 @@ from pathlib import Path
 from PyQt5.QtWidgets import (
     QWidget, QGridLayout, QApplication, QPushButton,
     QVBoxLayout, QHBoxLayout, QBoxLayout, QDialog,
-    QFrame
+    QFrame, QSizePolicy
 )
 from PyQt5.QtGui import QPainter, QPen, QColor
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -20,6 +20,8 @@ import worker_manager
 
 # saved next to this file; change if you want it elsewhere
 SAVE_FILE = Path(__file__).with_name("gauge_layout.json")
+BOX_W = 330
+BOX_H = 500
 
 class GaugeTemplateBox(QFrame):
     clicked = pyqtSignal()
@@ -32,11 +34,6 @@ class GaugeTemplateBox(QFrame):
                 border: 4px dashed #808080;
                 border-radius: 16px;
                 background: transparent;
-            }
-
-            GaugeTemplateBox:hover {
-                border-color: #4da3ff;
-                background: rgba(77,163,255,20);
             }
         """)
 
@@ -72,6 +69,9 @@ class GaugeTemplateBox(QFrame):
 
     def set_gauge(self, gauge: QWidget):
         self.gauge = gauge
+        self.setStyleSheet(None)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setSpacing(0)
         self._layout.addWidget(gauge)
         self.update()
 
@@ -80,13 +80,20 @@ class GaugeTemplateBox(QFrame):
         if self.gauge is None:
             return
         self._layout.removeWidget(self.gauge)
+        self.setStyleSheet("""
+                    GaugeTemplateBox {
+                        border: 4px dashed #808080;
+                        border-radius: 16px;
+                        background: transparent;
+                    }
+                """)
         self.gauge.setParent(None)
         self.gauge.deleteLater()
         self.gauge = None
         self.update()
 
 
-NUM_GAUGES_PER_ROW = 3
+NUM_GAUGES = 3
 # gauges with bottom row of indicators
 class GaugeLayoutPreset(QWidget):
     def __init__(self, can_db: Database, parent=None):
@@ -99,15 +106,9 @@ class GaugeLayoutPreset(QWidget):
         self.config_layout = QHBoxLayout()
         master.addLayout(self.config_layout)
 
-        all_gauges_layout = QVBoxLayout()
+        self.gauges_row_layout = QHBoxLayout()
 
-        self.gauges_1_layout = QHBoxLayout()
-        self.gauges_2_layout = QHBoxLayout()
-
-        all_gauges_layout.addLayout(self.gauges_1_layout)
-        all_gauges_layout.addLayout(self.gauges_2_layout)
-
-        master.addLayout(all_gauges_layout)
+        master.addLayout(self.gauges_row_layout)
 
         self.select_signal_popup = None
 
@@ -118,21 +119,21 @@ class GaugeLayoutPreset(QWidget):
 
         self.shell = None
 
-        for i in range(NUM_GAUGES_PER_ROW):
-            self.add_gauge_template_box(self.gauges_1_layout, slot=i)
-            self.add_gauge_template_box(self.gauges_2_layout, slot=i + NUM_GAUGES_PER_ROW)
+        for i in range(NUM_GAUGES):
+            self.add_gauge_template_box(self.gauges_row_layout, slot=i)
 
         self.load_gauges()
 
     def add_gauge_template_box(self, layout: QBoxLayout, slot: int):
         gauge_template_box = GaugeTemplateBox()
+        gauge_template_box.setFixedSize(BOX_W, BOX_H)
         gauge_template_box.slot = slot
         gauge_template_box.clicked.connect(lambda box=gauge_template_box: self.open_select_signal_popup(box))
         layout.addWidget(gauge_template_box)
         self.slots[slot] = gauge_template_box
 
     def open_select_signal_popup(self, gauge_template_box: GaugeTemplateBox):
-        self.select_signal_popup = SelectSignalPopup(can_db=self.can_db, parent=self)
+        self.select_signal_popup = SelectSignalPopup(can_db=self.can_db)
         worker_manager.set_owner(self.select_signal_popup, self.select_signal_popup.on_msgs)
 
         if self.select_signal_popup.exec() == QDialog.Accepted:

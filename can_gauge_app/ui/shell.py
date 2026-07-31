@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QStackedWidget, QApplication, QPushButton
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QStackedWidget, QApplication, QPushButton, QVBoxLayout
 from PyQt5.QtCore import Qt
 
 import worker_manager
@@ -14,16 +14,21 @@ class Shell(QWidget):
         master.setContentsMargins(0, 0, 0, 0)
         master.setSpacing(0)
 
+        btn_page_layout = QVBoxLayout()
+
         self.hamburger_btn = QPushButton("≡")
         self.hamburger_btn.clicked.connect(self._set_side_menu_vis)
-        master.addWidget(self.hamburger_btn)
+        self.hamburger_btn.setFixedSize(100, 50)
+        btn_page_layout.addWidget(self.hamburger_btn)
         
+        self.pages = QStackedWidget()
+        btn_page_layout.addWidget(self.pages)
+
         self.side_menu = SideMenu(BUTTON_LABELS)
         self.side_menu.setVisible(False)
         master.addWidget(self.side_menu)
 
-        self.pages = QStackedWidget()
-        master.addWidget(self.pages)
+        master.addLayout(btn_page_layout)
 
         self.side_menu.buttons["Gauge Display"].clicked.connect(lambda: self.show_page("gauge"))
         self.side_menu.buttons["Can Table"].clicked.connect(lambda: self.show_page("cantable"))

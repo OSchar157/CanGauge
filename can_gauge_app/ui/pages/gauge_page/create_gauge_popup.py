@@ -2,14 +2,20 @@ import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QGridLayout,
     QLineEdit, QComboBox, QPushButton, QLabel, QDialog,
-    QHBoxLayout, QBoxLayout, QScrollArea, QMessageBox
+    QHBoxLayout, QBoxLayout, QScrollArea, QMessageBox,
+    QScroller
 )
+
+from ui.kb_line_edit import KeyboardLineEdit, OnScreenKeyboard
+
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
 from ui.gauge_widgets import GAUGE_TYPES
 
 from can import Message
 from cantools.database import Database
 
+half_w = 1024//2
 class CreateGaugePopup(QDialog):
     def __init__(self, parent, can_db: Database, can_id: int, signal_name: str):
         super().__init__(parent)
@@ -18,34 +24,49 @@ class CreateGaugePopup(QDialog):
         self.can_id = can_id
         self.signal_name = signal_name
 
-        self.setWindowTitle("Create A Gauge")
+        self.keyboard = OnScreenKeyboard()
         
         master_layout = QVBoxLayout()
-        master_layout.addWidget(QLabel(f"Gauge Creation for: {signal_name}"))
+        desc_label = QLabel(f"Gauge Creation for: {signal_name}")
+        label_font = desc_label.font()
+        label_font.setPointSize(15)
+        desc_label.setFont(label_font)
+        master_layout.addWidget(desc_label)
+
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.showFullScreen()
 
         self.gauge_section_layout = QHBoxLayout()
-        gauge_config_layout = QVBoxLayout()
 
-        # Gauge selection
-        gauge_config_layout.addWidget(QLabel(f"Select gauge type:"))
+        gauge_config_container = QWidget()
+        gauge_config_container.setFixedWidth(half_w)
+        gauge_config_layout = QVBoxLayout(gauge_config_container)
+
+        label_font.setPointSize(13)
+        label = QLabel(f"Select gauge type:")
+        label.setFont(label_font)
+        gauge_config_layout.addWidget(label)
         self.gauge_sel_dropdown = QComboBox()
         self.gauge_sel_dropdown.addItems(gauge_cls.name for gauge_cls in GAUGE_TYPES.values())
         self.gauge_sel_dropdown.currentTextChanged.connect(self._on_gauge_type_selected)
         gauge_config_layout.addWidget(self.gauge_sel_dropdown)
-        
+
         self.selected_gauge_type = GAUGE_TYPES[self.gauge_sel_dropdown.currentText()]
 
-        # Gauge params
         self.gauge_params_layout = QVBoxLayout()
         self.gauge_params_inputs: dict[str, QLabel] = {}
         self._populate_gauge_params()
         gauge_config_layout.addLayout(self.gauge_params_layout)
 
-        self.gauge_section_layout.addLayout(gauge_config_layout)
+        self.gauge_section_layout.addWidget(gauge_config_container)
         master_layout.addLayout(self.gauge_section_layout)
-        
-        # Preview window
+
         self.gauge_preview_widget = None
+        self.preview_container = QWidget()
+        self.preview_container.setFixedWidth(half_w)
+        self.preview_layout = QVBoxLayout(self.preview_container)
+        self.gauge_section_layout.addWidget(self.preview_container)
+
         self._set_gauge_preview_widget()
 
         # Add to gauge page button
@@ -57,6 +78,8 @@ class CreateGaugePopup(QDialog):
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.reject)
         master_layout.addWidget(close_btn)
+
+        master_layout.addWidget(self.keyboard)
         
         self.setLayout(master_layout)
 
@@ -64,7 +87,7 @@ class CreateGaugePopup(QDialog):
     
     def _set_gauge_preview_widget(self):
         if self.gauge_preview_widget is not None:
-            self.gauge_section_layout.removeWidget(self.gauge_preview_widget)
+            self.preview_layout.removeWidget(self.gauge_preview_widget)
             self.gauge_preview_widget.deleteLater()
 
         try:
@@ -72,9 +95,12 @@ class CreateGaugePopup(QDialog):
             new_widget = self.selected_gauge_type(**args)
         except:
             new_widget = QLabel("Invalid Arguments!")
+            font = new_widget.font()
+            font.setPointSize(17)
+            new_widget.setFont(font)
 
         self.gauge_preview_widget = new_widget
-        self.gauge_section_layout.addWidget(self.gauge_preview_widget)
+        self.preview_layout.addWidget(self.gauge_preview_widget)
 
     def _on_gauge_type_selected(self, text): 
         self.selected_gauge_type = GAUGE_TYPES[text]
@@ -87,13 +113,14 @@ class CreateGaugePopup(QDialog):
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
+        QScroller.grabGesture(scroll_area.viewport(), QScroller.LeftMouseButtonGesture)
 
         content_widget = QWidget()
         gauge_params_layout = QVBoxLayout(content_widget)
 
         for field in self.selected_gauge_type.get_fields():
             row = QHBoxLayout()
-            edit = QLineEdit()
+            edit = KeyboardLineEdit(self.keyboard)
 
             if field.type == int:
                 edit.setValidator(QIntValidator())

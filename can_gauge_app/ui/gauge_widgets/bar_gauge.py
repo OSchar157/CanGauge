@@ -38,7 +38,6 @@ VALUE_FONT_SIZE = 22
 UNIT_FONT_SIZE  = 12
 
 
-
 class BarGauge(Gauge):
 
     name = "Bar Gauge"
@@ -171,6 +170,8 @@ class BarGauge(Gauge):
         text_w = tick_col_w - TICK_TEXT_PAD - TICK_LEN
         text_h = fm.height()
 
+        num_dec_places = self.num_dec_places if (self.max_val - self.min_val) % NUM_TICKS != 0 else 0
+
         for i, val in enumerate(self._tick_values()):
             y = by + bh - (i / NUM_TICKS) * bh
 
@@ -185,7 +186,7 @@ class BarGauge(Gauge):
             painter.setPen(LABEL_COLOR)
             painter.drawText(0, int(y - text_h / 2), text_w, text_h,
                              Qt.AlignRight | Qt.AlignVCenter,
-                             self._format_tick(val, self.num_dec_places))
+                             self._format_tick(val, num_dec_places))
 
     def _draw_value(self, painter, W, y, value_h, unit_h):
         """Draw the numeric readout and unit below the bar."""

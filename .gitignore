@@ -1,5 +1,6 @@
 .DS_Store
 .venv
+venv
 __pycache__/
 subaru_global.dbc
 analyze_can_data/
