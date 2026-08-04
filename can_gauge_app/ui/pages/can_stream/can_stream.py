@@ -20,21 +20,19 @@ DLC_COLOR = "#808080"
 NAME_COLOR = "#ff6583"
 DATA_COLOR = "#d4d4d4"
 
-
 class CanStream(QtWidgets.QPlainTextEdit):
     def __init__(self, can_db: Database):
         super().__init__()
 
-        self.shell = None
         self.can_db = can_db
 
         self.setReadOnly(True)
-        self.setMaximumBlockCount(2000)
+        self.setMaximumBlockCount(50)
         self.setUndoRedoEnabled(False)
         self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
-        self.viewport().setCursor(Qt.CursorShape.ArrowCursor)
+        self.verticalScrollBar().setVisible(False)
 
-        self.setFont(QtGui.QFont(MONO, 13))
+        self.setFont(QtGui.QFont(MONO, 15))
         self.setStyleSheet(f"""
             QPlainTextEdit {{
                 background-color: {BG};
@@ -42,7 +40,7 @@ class CanStream(QtWidgets.QPlainTextEdit):
                 border: none;
             }}
         """)
-        self.setViewportMargins(5, 5, 5, 5)
+        self.setViewportMargins(20, 5, 0, 0)
 
         self._scratch_doc = QtGui.QTextDocument()
         self._scratch_cursor = QTextCursor(self._scratch_doc)
@@ -66,6 +64,9 @@ class CanStream(QtWidgets.QPlainTextEdit):
         self._fmt_data = QTextCharFormat()
         self._fmt_data.setForeground(QColor(DATA_COLOR))
 
+    def configure_util_bar(self, util_bar_layout):
+        pass
+    
     def on_msgs(self, msgs: list[Message]):
         if not msgs:
             return
@@ -104,6 +105,6 @@ class CanStream(QtWidgets.QPlainTextEdit):
         ui_cursor.insertFragment(QtGui.QTextDocumentFragment(self._scratch_doc))
 
         if was_at_bottom:
-            scroll_bar.setValue(scroll_bar.maximum())
+            scroll_bar.setValue(scroll_bar.maximum() - 1)
 
         self.setUpdatesEnabled(True)

@@ -1,0 +1,4 @@
+from ui.pages.gauge_page.layout_presets.dual_row_layout_preset import DualRowGaugeLayout
+from ui.pages.gauge_page.layout_presets.single_row_layout_preset import SingleRowGaugeLayout
+
+GAUGE_LAYOUT_PAGE_TYPES = [SingleRowGaugeLayout, DualRowGaugeLayout]

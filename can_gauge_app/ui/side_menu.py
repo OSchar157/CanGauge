@@ -20,10 +20,9 @@ class SideMenu(QWidget):
         self.buttons = {}
         for label in self.button_labels:
             btn = QPushButton(label)
-            btn.setStyleSheet("color: white; text-align: left; padding: 10px; border: none;")
+            btn.setStyleSheet("color: white; text-align: left; padding: 10px; border: none; font-size: 18px;")
             btn.setCursor(Qt.PointingHandCursor)
             layout.addWidget(btn)
             self.buttons[label] = btn
-
 
         layout.addStretch()

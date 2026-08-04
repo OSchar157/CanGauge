@@ -19,45 +19,35 @@ WARNING_ZONE_COLOR = "#E8A020"
 DANGER_ZONE_COLOR = "#CC2200"
 SAFE_ZONE_COLOR = "#ffffff"
 
-NUM_MINOR_TICKS = 3
-
 class NeedleGauge(Gauge):
-    """
-    Reusable gauge widget.
-
-    args:
-        min_val         (float):    minimum value on the gauge
-        max_val         (float):    maximum value on the gauge
-        warn_low        (float):    value where low warning zone ends
-        warn_high        (float):    value where high warning zone begins
-        danger_low      (float):    value where low danger zone ends
-        danger_high     (float):    value where high danger zone begins
-        maj_ticks       (int):      number of major tick marks
-        untit           (str):      units of the value
-
-    """
 
     name = "Needle Gauge"
 
     @classmethod
     def get_fields(cls) -> list[ParamSpec]:
-        return Gauge.get_fields() + [ParamSpec("maj_ticks", "Major Ticks", int)]
+        gauge_fields = super().get_fields()
+        
+        return gauge_fields + [ParamSpec("major_ticks", "Major Ticks", int, 10), 
+                               ParamSpec("minor_ticks", "Minor Ticks", int, 3)
+                               ]
     
     def __init__(
         self,
-        val_offset=0,
-        val_scale=1,
-        min_val=0,
-        max_val=100,
-        warn_low=20,
-        warn_high=80,
-        danger_low=10,
-        danger_high=90,
-        unit="",
-        label="",
-        maj_ticks=10,
+        val_offset,
+        val_scale,
+        min_val,
+        max_val,
+        warn_low,
+        warn_high,
+        danger_low,
+        danger_high,
+        unit,
+        label,
+        major_ticks: int=10,
+        minor_ticks: int=3,
         parent=None
     ):
+        
         super().__init__(
             val_offset,
             val_scale,
@@ -71,8 +61,21 @@ class NeedleGauge(Gauge):
             label,
             parent
         )
+
+        # switch to ensuring they are ints
+        if minor_ticks is None:
+            raise ValueError("minor_ticks must be int.")
+        if major_ticks is None:
+            raise ValueError("major_ticks must be int.")
+
+        if major_ticks < 1:
+            raise ValueError(f"maj_ticks must be at least 1.")
+        
+        if minor_ticks < 0:
+            raise ValueError(f"maj_ticks must be at least 0.")
     
-        self.maj_ticks = maj_ticks
+        self.major_ticks = major_ticks
+        self.minor_ticks = minor_ticks
 
     def sizeHint(self):
         return QSize(400, 400)
@@ -141,16 +144,16 @@ class NeedleGauge(Gauge):
         self._draw_segment(painter, pen, ang_danger_high, ang_end, DANGER_ZONE_COLOR)
 
     def _draw_ticks(self, painter):
-        total_ticks = self.maj_ticks * NUM_MINOR_TICKS + self.maj_ticks
-        middle_minor = (NUM_MINOR_TICKS + 1) // 2  # index within group that is middle
+        total_ticks = self.major_ticks * self.minor_ticks + self.major_ticks
+        middle_minor = (self.minor_ticks + 1) // 2  # index within group that is middle
 
         for i in range(total_ticks + 1):
             frac = i / total_ticks
             angle = math.radians(225 - frac * 270)
 
-            is_major = (i % (NUM_MINOR_TICKS + 1) == 0)
-            position_in_group = i % (NUM_MINOR_TICKS + 1)
-            is_middle_minor = (not is_major) and (NUM_MINOR_TICKS % 2 == 1) and (position_in_group == middle_minor)
+            is_major = (i % (self.minor_ticks + 1) == 0)
+            position_in_group = i % (self.minor_ticks + 1)
+            is_middle_minor = (not is_major) and (self.minor_ticks % 2 == 1) and (position_in_group == middle_minor)
 
             if is_major:
                 inner_r, outer_r = 62, 76
@@ -179,8 +182,8 @@ class NeedleGauge(Gauge):
         font = QFont("Courier New", 7, QFont.Bold)
         painter.setFont(font)
 
-        for i in range(self.maj_ticks + 1):
-            frac = i / self.maj_ticks
+        for i in range(self.major_ticks + 1):
+            frac = i / self.major_ticks
             val = int(self.min_val + frac * (self.max_val - self.min_val))
             angle = math.radians(225 - frac * 270)
 

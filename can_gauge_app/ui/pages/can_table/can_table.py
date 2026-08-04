@@ -1,29 +1,28 @@
 from PyQt5.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QWidget, QVBoxLayout,
-    QPushButton, QLabel, QFormLayout, QHeaderView,
-    QDialog, QHBoxLayout
+    QPushButton, QHeaderView,
+    QDialog, QHBoxLayout, QScroller
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from ui.pages.can_table.create_gauge_popup import CreateGaugePopup
 from ui.pages.can_table.decode_id_popup import DecodeIdPopup
 from ui.utils import format_timestamp, format_data
+
+import worker_manager
 
 from cantools.database import Database
 from can import Message
 
+COL_HEADERS = ["TIMESTAMP", "IFACE", "ID", "DLC", "NAME", "DATA"]
 class CanTable(QWidget):
-    def __init__(self, on_gauge_requested, can_db: Database, parent=None):
+    def __init__(self, can_db: Database, parent=None):
         super().__init__(parent)
 
-        self.shell = None
-
-        self.on_gauge_requested = on_gauge_requested
         self.can_db = can_db
 
         self.decode_id_popup = None
         self.create_gauge_popup = None
 
-        self._current_sort_col = 2  # Default to ID column matching your initial setup
+        self._current_sort_col = 2
         self._current_sort_order = Qt.AscendingOrder
 
         self._build_ui()
@@ -35,22 +34,56 @@ class CanTable(QWidget):
         layout = QVBoxLayout(self)
 
         self.tree = QTreeWidget()
-        self.tree.setColumnCount(6)
-        self.tree.setHeaderLabels(["Timestamp", "Interface", "ID", "Data Len", "Name", "Data"])
+        self.tree.setColumnCount(len(COL_HEADERS))
+        self.tree.setHeaderLabels(COL_HEADERS)
         self.tree.setSortingEnabled(False)
-        # self.tree.sortItems(2, Qt.AscendingOrder)
+        self.tree.setIndentation(50)
         layout.addWidget(self.tree)
 
         table_header = self.tree.header()
         table_header.setSectionsClickable(True)
         table_header.sectionClicked.connect(self._manual_sort_table)
 
+        font = self.tree.font()
+        font.setPointSize(16)
+        self.tree.setFont(font)
+
+        self.tree.setStyleSheet("""
+            QTreeWidget::item {
+                padding: 12px 4px;
+            }
+
+            QScrollBar:vertical {
+                width: 40px;
+            }
+
+            QScrollBar::handle:vertical {
+                background: #808080;
+                border-radius: 8px;
+                min-height: 40px;
+            }
+
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """)
+
+        col_widths = [175,65,60,50,250,300]
+        for col in range(len(COL_HEADERS)):
+            self.tree.setColumnWidth(col, col_widths[col])
+
         self.tree.collapseAll()
 
         self.can_ids_seen: dict[int, QWidget] = {}
 
+    def configure_util_bar(self, util_bar_layout):
+        pass
+    
     def _manual_sort_table(self, col: int):
-        # 1. Flip order if clicking the same column, otherwise default to Ascending
         if self._current_sort_col == col:
             if self._current_sort_order == Qt.AscendingOrder:
                 self._current_sort_order = Qt.DescendingOrder
@@ -59,12 +92,9 @@ class CanTable(QWidget):
         else:
             self._current_sort_col = col
             self._current_sort_order = Qt.AscendingOrder
-            
-        # 2. Force the header triangle icon to match your tracked state
+
         table_header = self.tree.header()
         table_header.setSortIndicator(self._current_sort_col, self._current_sort_order)
-        
-        # 3. Fire the single manual sort execution pass
         self.tree.sortItems(self._current_sort_col, self._current_sort_order)
 
     def add_row(self, raw_msg: Message, msg_name: str, id_is_decodable: bool):
@@ -73,77 +103,53 @@ class CanTable(QWidget):
         item = QTreeWidgetItem(["", str(raw_msg.channel), f"{can_id:02X}", str(raw_msg.dlc), msg_name, ""])
         self.tree.addTopLevelItem(item)
 
-        # child item that holds the expanded custom widget area
-        child = QTreeWidgetItem(item)
-        item.addChild(child)
-        self.tree.setFirstItemColumnSpanned(child, True)
-
-        expand_widget = QWidget()
-        expand_layout = QVBoxLayout(expand_widget)
-        expand_layout.setAlignment(Qt.AlignLeft)
-
         if id_is_decodable:
-            self._build_signals_section(item, expand_layout, raw_msg)
+            self._build_signals_section(item, raw_msg)
         else:
-            self._build_decode_section(expand_layout, raw_msg)
-
-        self.tree.setItemWidget(child, 0, expand_widget)
+            self._add_decode_row(item, "Decode", raw_msg)
 
         self.can_ids_seen[can_id] = item
-    
-    def _build_signals_section(self, item: QTreeWidgetItem, layout: QVBoxLayout, raw_msg: Message):
+
+    def _build_signals_section(self, item: QTreeWidgetItem, raw_msg: Message):
         can_id = raw_msg.arbitration_id
 
-        signal_labels: dict[str, QLabel] = {}
-        item.signal_labels = signal_labels
-
-        signals_form = QFormLayout()
-        signals_form.setFormAlignment(Qt.AlignLeft)
+        signal_items: dict[str, QTreeWidgetItem] = {}
+        item.signal_items = signal_items
 
         signals = self.can_db.get_message_by_frame_id(can_id).signals
 
         for signal in signals:
-            sig_name = signal.name
-            sig_name_label = QLabel(f"{sig_name}:")
-            value_label = QLabel("")
-            item.signal_labels[sig_name] = value_label
-            signals_form.addRow(sig_name_label, value_label)
+            sig_item = QTreeWidgetItem(item, ["", "", "", "", signal.name, ""])
+            signal_items[signal.name] = sig_item
 
-        layout.addLayout(signals_form)
+        self._add_decode_row(item, "Edit Decoding", raw_msg)
 
-        btn_layout = QHBoxLayout()
+    def _add_decode_row(self, item: QTreeWidgetItem, btn_name: str, raw_msg: Message):
+        btn_child = QTreeWidgetItem(item)
+        self.tree.setFirstItemColumnSpanned(btn_child, True)
 
-        create_gauge_btn = QPushButton("Create Gauge")
-        can_msg_name = self.can_db.get_message_by_frame_id(can_id).name
-        signal_names = [signal.name for signal in signals]
-        create_gauge_btn.clicked.connect(
-            lambda checked,i=can_id, n=can_msg_name, s=signal_names: self.on_click_create_gauge_btn(i, n, s)
-        )
-        btn_layout.addWidget(create_gauge_btn)
+        container = QWidget()
+        btn_layout = QHBoxLayout(container)
+        btn_layout.setContentsMargins(8, 4, 8, 40)
+        btn_layout.setAlignment(Qt.AlignCenter)
 
-        edit_encoding_btn = QPushButton("Edit Encoding")
-        edit_encoding_btn.clicked.connect(lambda checked, m=raw_msg: self.on_click_decode_btn(m))
-        btn_layout.addWidget(edit_encoding_btn)
+        btn = QPushButton(btn_name)
+        btn.setMinimumWidth(160)
+        btn.setFixedHeight(45)
+        btn.clicked.connect(lambda checked, m=raw_msg: self.on_click_decode_btn(m))
+        btn_layout.addWidget(btn)
 
-        layout.addLayout(btn_layout)
-
-    def _build_decode_section(self, layout: QVBoxLayout, msg: Message):
-        decode_btn = QPushButton("Decode")
-        decode_btn.clicked.connect(lambda checked, m=msg: self.on_click_decode_btn(m))
-        layout.addWidget(decode_btn)
-        
-    def on_click_create_gauge_btn(self, can_id, can_msg_name, signal_names):
-        self.create_gauge_popup = CreateGaugePopup(self, can_id, can_msg_name, signal_names, self.on_gauge_requested)
-        self.create_gauge_popup.exec()
+        self.tree.setItemWidget(btn_child, 0, container)
 
     def on_click_decode_btn(self, raw_msg: Message):
         self.decode_id_popup = DecodeIdPopup(raw_msg=raw_msg, can_db=self.can_db)
-        self.shell.worker.msg_buffer_emitter.connect(self.decode_id_popup.on_msgs)
+        worker_manager.set_owner(self.decode_id_popup, self.decode_id_popup.on_msgs)
 
         if self.decode_id_popup.exec_() == QDialog.Accepted:
-            self.shell.worker.msg_buffer_emitter.disconnect(self.decode_id_popup.on_msgs)
             self.decode_id_popup = None
             self._build_ui()
+
+        worker_manager.set_owner(self, self.on_msgs)
 
     def on_click_edit_encoding_btn(self, msg: Message):
         self.decode_id_popup = DecodeIdPopup(msg=msg, can_db=self.can_db)
@@ -189,11 +195,11 @@ class CanTable(QWidget):
             if not is_decodable:
                 continue
 
-            signal_labels = item.signal_labels
+            signal_items = item.signal_items
             for sig_name, sig_val in decoded_msg_signals.items():
-                if sig_name in signal_labels:
-                    signal_labels[sig_name].setText(fmt_sig(sig_val))
-    
+                if sig_name in signal_items:
+                    signal_items[sig_name].setText(5, fmt_sig(sig_val))
+
         self.tree.setUpdatesEnabled(True)
 
 def format_signal_value(value):

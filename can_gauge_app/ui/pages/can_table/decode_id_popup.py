@@ -1,12 +1,14 @@
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QGridLayout,
-    QLineEdit, QComboBox, QPushButton, QLabel, QDialog,
+    QComboBox, QPushButton, QLabel, QDialog,
     QHBoxLayout, QBoxLayout, QTableWidget, QHeaderView,
-    QMessageBox, QScrollArea
+    QMessageBox, QScrollArea, QScroller
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
+
+from ui.kb_line_edit import KeyboardLineEdit, OnScreenKeyboard
 
 import cantools.database
 from cantools.database import Message, Signal, Database, Message
@@ -43,10 +45,13 @@ class DecodeIdPopup(QDialog):
             self.signals = None
             self.can_msg_name = ""
 
-        self.setWindowTitle(f"Decode CAN ID: {dec_to_hex(self.can_id)}")
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.showFullScreen()
 
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
+
+        self.keyboard = OnScreenKeyboard()
 
         self._init_data_preview_section()
         self._init_can_message_info_section()
@@ -59,26 +64,29 @@ class DecodeIdPopup(QDialog):
         btn_layout.addWidget(self.save_btn)
 
         self.close_btn = QPushButton("Close")
-        self.close_btn.clicked.connect(self.close)
+        self.close_btn.clicked.connect(self.reject)
         btn_layout.addWidget(self.close_btn)
 
         self.main_layout.addLayout(btn_layout)
+        self.main_layout.addWidget(self.keyboard)
     
     def _init_data_preview_section(self):
         section_layout = QVBoxLayout()
         section_layout.addWidget(QLabel("Data Preview:"))
 
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        QScroller.grabGesture(scroll_area.viewport(), QScroller.LeftMouseButtonGesture)
+
+        scroll_container = QWidget()
+        bytes_layout = QVBoxLayout(scroll_container)
+
         hex_layout = QHBoxLayout()
         hex_layout.addWidget(QLabel("Raw Hex:"))
         self.msg_hex_data_label = QLabel("")
         hex_layout.addWidget(self.msg_hex_data_label)
-        section_layout.addLayout(hex_layout)
-        
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-
-        scroll_container = QWidget()
-        bytes_layout = QVBoxLayout(scroll_container)
+        bytes_layout.addLayout(hex_layout)
 
         self.msg_bit_data_labels = [QLabel() for _ in range(self.data_len)]
         for i, w in enumerate(self.msg_bit_data_labels):
@@ -99,7 +107,7 @@ class DecodeIdPopup(QDialog):
 
             if isinstance(widget, QComboBox):
                 text = widget.currentText()
-            elif isinstance(widget, QLineEdit):
+            elif isinstance(widget, KeyboardLineEdit):
                 text = widget.text()
             
             col_header = self.signals_table.horizontalHeaderItem(col).text()
@@ -200,14 +208,14 @@ class DecodeIdPopup(QDialog):
         #### NAME FIELD
         name_layout = QVBoxLayout()
         name_layout.addWidget(QLabel("Name"))
-        self.name_line_edit = QLineEdit(self.can_msg_name)
+        self.name_line_edit = KeyboardLineEdit(self.keyboard, self.can_msg_name)
         name_layout.addWidget(self.name_line_edit)
         can_msg_info_layout.addLayout(name_layout)
 
         #### CAN ID
         canid_layout = QVBoxLayout()
         canid_layout.addWidget(QLabel("CAN ID"))
-        self.canid_line_edit = QLineEdit(dec_to_hex(self.can_id))
+        self.canid_line_edit = KeyboardLineEdit(self.keyboard, dec_to_hex(self.can_id))
         self.canid_line_edit.setReadOnly(True)
         canid_layout.addWidget(self.canid_line_edit)
         can_msg_info_layout.addLayout(canid_layout)
@@ -215,7 +223,7 @@ class DecodeIdPopup(QDialog):
         #### Type
         type_layout = QVBoxLayout()
         type_layout.addWidget(QLabel("Type"))
-        self.type_line_edit = QLineEdit("Extended" if self.is_extended else "Standard")
+        self.type_line_edit = KeyboardLineEdit(self.keyboard, "Extended" if self.is_extended else "Standard")
         self.type_line_edit.setReadOnly(True)
         type_layout.addWidget(self.type_line_edit)
         can_msg_info_layout.addLayout(type_layout)
@@ -223,7 +231,7 @@ class DecodeIdPopup(QDialog):
         #### Length
         length_layout = QVBoxLayout()
         length_layout.addWidget(QLabel("Length"))
-        self.length_line_edit = QLineEdit(str(self.data_len))
+        self.length_line_edit = KeyboardLineEdit(self.keyboard, str(self.data_len))
         self.length_line_edit.setReadOnly(True)
         length_layout.addWidget(self.length_line_edit)
         can_msg_info_layout.addLayout(length_layout)
@@ -296,28 +304,28 @@ class DecodeIdPopup(QDialog):
                 cell_widget.addItems(ORDER_OPTS)
                 cell_widget.setCurrentIndex(order_opt_index)
             elif col_name == "Length":
-                cell_widget = QLineEdit(bit_length)
+                cell_widget = KeyboardLineEdit(self.keyboard, bit_length)
                 cell_widget.setValidator(int_validator)
             elif col_name == "Start Bit":
-                cell_widget = QLineEdit(start_bit)
+                cell_widget = KeyboardLineEdit(self.keyboard, start_bit)
                 cell_widget.setValidator(int_validator)
             elif col_name == "Name":
-                cell_widget = QLineEdit(name)
+                cell_widget = KeyboardLineEdit(self.keyboard, name)
             elif col_name == "Unit":
-                cell_widget = QLineEdit(unit)
+                cell_widget = KeyboardLineEdit(self.keyboard, unit)
             elif col_name == "Value":
-                cell_widget = QLineEdit("N/A")
+                cell_widget = KeyboardLineEdit(self.keyboard, "N/A")
                 cell_widget.setReadOnly(True)
             elif col_name == "Scale":
-                cell_widget = QLineEdit(scale)
+                cell_widget = KeyboardLineEdit(self.keyboard, scale)
                 cell_widget.setValidator(double_validator)
             elif col_name == "Offset":
-                cell_widget = QLineEdit(offset)
+                cell_widget = KeyboardLineEdit(self.keyboard, offset)
                 cell_widget.setValidator(double_validator)
             elif col_name == "Min":
-                cell_widget = QLineEdit(min_val)
+                cell_widget = KeyboardLineEdit(self.keyboard, min_val)
             elif col_name == "Max":
-                cell_widget = QLineEdit(max_val)
+                cell_widget = KeyboardLineEdit(self.keyboard, max_val)
             
             self.signals_table.setCellWidget(row, i, cell_widget)
 
@@ -336,9 +344,14 @@ class DecodeIdPopup(QDialog):
             )
         
             decoded = message.decode(msg.data)
-            new_val = f"{next(iter(decoded.values())):.3f}"
+            new_val = next(iter(decoded.values()))
+            if isinstance(new_val, float):
+                new_val = f"{new_val:.3f}"
+            else:
+                new_val = str(new_val)
+
         except:
-            new_val = "N/A"
+            new_val = "--"
 
         signal_val_widget.setText(new_val)
 
