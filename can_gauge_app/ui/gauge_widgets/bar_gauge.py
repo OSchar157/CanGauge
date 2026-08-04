@@ -262,10 +262,17 @@ class DemoWindow(QWidget):
             unit="°C", label="TEMP",
         )
 
+        self.voltage = BarGauge(
+            min_val=3, max_val=4,
+            danger_low=None, warn_low=None,
+            warn_high=None, danger_high=None,
+            unit="", label="Avg Voltage",
+        )
+
         # Stretch on both sides keeps the width-capped gauges centered when
         # the window is wider than they need.
         layout.addStretch(1)
-        for g in (self.battery, self.fuel, self.temp):
+        for g in (self.battery, self.fuel, self.temp, self.voltage):
             layout.addWidget(g)
         layout.addStretch(1)
 
@@ -289,6 +296,10 @@ class DemoWindow(QWidget):
         # Temperature rises then cools
         temp = 60 + 55 * abs(math.sin(self._t * 0.015))
         self.temp.set_value(temp)
+
+        # Fuel oscillates
+        voltage = 3.5 + 0.5 * math.sin(self._t * 0.015)
+        self.voltage.set_value(voltage)
 
 
 if __name__ == "__main__":
