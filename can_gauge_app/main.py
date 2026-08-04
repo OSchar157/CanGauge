@@ -5,9 +5,6 @@ from PyQt5.QtWidgets import QApplication
 import worker_manager
 
 from ui.shell import Shell
-from ui.pages.gauge_page.layout_presets.gauge_layout_preset import GaugeLayoutPreset
-from ui.pages.can_table.can_table import CanTable
-from ui.pages.can_stream.can_stream import CanStream
 
 import app_state
 
@@ -29,6 +26,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setApplicationName("CanGauge") 
     app.setDesktopFileName("CanGauge")
+    app.setStyle("Fusion")
 
     if len(sys.argv) == 1:
         app_state.demo_mode = False
@@ -48,15 +46,7 @@ if __name__ == "__main__":
     dbc_path = app_state.dbc_path()
     db.add_dbc_string(open(f'../{dbc_path}').read())
     
-    shell = Shell()
-    gauge_page = GaugeLayoutPreset(can_db=db)
-    can_table = CanTable(on_gauge_requested=gauge_page.add_gauge, can_db=db)
-    can_stream = CanStream(can_db=db)
-
-    shell.add_page("gauge", gauge_page)
-    shell.add_page("cantable", can_table)
-    shell.add_page("canstream", can_stream)
-    shell.show_page("cantable")
+    shell = Shell(can_db=db)
 
     shell.showFullScreen()
     # shell.showMaximized()

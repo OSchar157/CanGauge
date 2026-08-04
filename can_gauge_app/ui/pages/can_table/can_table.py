@@ -14,10 +14,9 @@ from can import Message
 
 COL_HEADERS = ["TIMESTAMP", "IFACE", "ID", "DLC", "NAME", "DATA"]
 class CanTable(QWidget):
-    def __init__(self, on_gauge_requested, can_db: Database, parent=None):
+    def __init__(self, can_db: Database, parent=None):
         super().__init__(parent)
 
-        self.on_gauge_requested = on_gauge_requested
         self.can_db = can_db
 
         self.decode_id_popup = None
@@ -81,6 +80,9 @@ class CanTable(QWidget):
 
         self.can_ids_seen: dict[int, QWidget] = {}
 
+    def configure_util_bar(self, util_bar_layout):
+        pass
+    
     def _manual_sort_table(self, col: int):
         if self._current_sort_col == col:
             if self._current_sort_order == Qt.AscendingOrder:

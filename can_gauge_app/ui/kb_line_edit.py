@@ -14,7 +14,7 @@ class OnScreenKeyboard(QWidget):
             "1234567890",
             "qwertyuiop",
             "asdfghjkl ",
-            "zxcvbnm,. ",
+            "zxcvbnm,.-",
         ]
 
         for row in rows:

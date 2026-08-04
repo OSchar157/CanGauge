@@ -64,6 +64,9 @@ class CanStream(QtWidgets.QPlainTextEdit):
         self._fmt_data = QTextCharFormat()
         self._fmt_data.setForeground(QColor(DATA_COLOR))
 
+    def configure_util_bar(self, util_bar_layout):
+        pass
+    
     def on_msgs(self, msgs: list[Message]):
         if not msgs:
             return

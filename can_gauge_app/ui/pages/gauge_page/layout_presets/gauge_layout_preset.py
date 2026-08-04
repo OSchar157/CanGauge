@@ -2,98 +2,20 @@ import json
 from pathlib import Path
 
 from PyQt5.QtWidgets import (
-    QWidget, QGridLayout, QApplication, QPushButton,
+    QWidget, QApplication, QPushButton,
     QVBoxLayout, QHBoxLayout, QBoxLayout, QDialog,
-    QFrame, QSizePolicy
 )
-from PyQt5.QtGui import QPainter, QPen, QColor
-from PyQt5.QtCore import Qt, pyqtSignal
 
 from can import Message
 from cantools.database import Database
 
 from ui.pages.gauge_page.select_signal_popup import SelectSignalPopup
+from ui.pages.gauge_page.layout_presets.gauge_template_box import GaugeTemplateBox
 from ui.gauge_widgets.gauge import Gauge
 from ui import gauge_widgets  # package of gauge classes; adjust if this isn't where it lives
 
 import worker_manager
 
-# saved next to this file; change if you want it elsewhere
-SAVE_FILE = Path(__file__).with_name("gauge_layout.json")
-BOX_W = 330
-BOX_H = 500
-
-class GaugeTemplateBox(QFrame):
-    clicked = pyqtSignal()
-
-    def __init__(self):
-        super().__init__()
-
-        self.setStyleSheet("""
-            GaugeTemplateBox {
-                border: 4px dashed #808080;
-                border-radius: 16px;
-                background: transparent;
-            }
-        """)
-
-        self.slot = None
-        self.gauge = None
-
-        self._layout = QVBoxLayout(self)
-
-    def paintEvent(self, event):
-        super().paintEvent(event)
-
-        if self.gauge is not None:
-            return
-
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        pen = QPen(QColor("#808080"), 4)
-        pen.setCapStyle(Qt.RoundCap)
-        painter.setPen(pen)
-
-        s = 16  # half-length of plus
-        c = self.rect().center()
-
-        painter.drawLine(c.x() - s, c.y(), c.x() + s, c.y())
-        painter.drawLine(c.x(), c.y() - s, c.x(), c.y() + s)
-
-    def mousePressEvent(self, event):
-        if self.gauge is not None:
-            return
-        if event.button() == Qt.LeftButton:
-            self.clicked.emit()
-
-    def set_gauge(self, gauge: QWidget):
-        self.gauge = gauge
-        self.setStyleSheet(None)
-        self._layout.setContentsMargins(0, 0, 0, 0)
-        self._layout.setSpacing(0)
-        self._layout.addWidget(gauge)
-        self.update()
-
-    def clear_gauge(self):
-        """Undo set_gauge(): tear the widget back out and show the '+' placeholder again."""
-        if self.gauge is None:
-            return
-        self._layout.removeWidget(self.gauge)
-        self.setStyleSheet("""
-                    GaugeTemplateBox {
-                        border: 4px dashed #808080;
-                        border-radius: 16px;
-                        background: transparent;
-                    }
-                """)
-        self.gauge.setParent(None)
-        self.gauge.deleteLater()
-        self.gauge = None
-        self.update()
-
-
-NUM_GAUGES = 3
 # gauges with bottom row of indicators
 class GaugeLayoutPreset(QWidget):
     def __init__(self, can_db: Database, parent=None):
@@ -106,9 +28,9 @@ class GaugeLayoutPreset(QWidget):
         self.config_layout = QHBoxLayout()
         master.addLayout(self.config_layout)
 
-        self.gauges_row_layout = QHBoxLayout()
+        self.gauges_layout = QVBoxLayout()
 
-        master.addLayout(self.gauges_row_layout)
+        master.addLayout(self.gauges_layout)
 
         self.select_signal_popup = None
 
@@ -119,14 +41,9 @@ class GaugeLayoutPreset(QWidget):
 
         self.shell = None
 
-        for i in range(NUM_GAUGES):
-            self.add_gauge_template_box(self.gauges_row_layout, slot=i)
-
-        self.load_gauges()
-
-    def add_gauge_template_box(self, layout: QBoxLayout, slot: int):
+    def add_gauge_template_box(self, layout: QBoxLayout, box_size: tuple[int, int], slot: int):
         gauge_template_box = GaugeTemplateBox()
-        gauge_template_box.setFixedSize(BOX_W, BOX_H)
+        gauge_template_box.setFixedSize(box_size[0], box_size[1])
         gauge_template_box.slot = slot
         gauge_template_box.clicked.connect(lambda box=gauge_template_box: self.open_select_signal_popup(box))
         layout.addWidget(gauge_template_box)
@@ -221,30 +138,14 @@ class GaugeLayoutPreset(QWidget):
 
                 ids_to_update.discard(can_id)
 
-    def save_gauges(self):
-        configs = [
+    def json(self) -> list[dict]:
+        return [
             box.gauge._config
             for box in self.slots.values()
             if box.gauge is not None
         ]
-        try:
-            with open(SAVE_FILE, "w") as f:
-                json.dump(configs, f, indent=2)
-        except (OSError, TypeError) as e:
-            # TypeError = something in gauge_args wasn't JSON-serializable
-            print(f"Failed to save gauges: {e}")
 
-    def load_gauges(self):
-        if not SAVE_FILE.exists():
-            return
-
-        try:
-            with open(SAVE_FILE) as f:
-                configs = json.load(f)
-        except (OSError, json.JSONDecodeError) as e:
-            print(f"Failed to load gauges: {e}")
-            return
-
+    def load_gauges(self, configs: list[dict]):
         for cfg in configs:
             gauge_cls = getattr(gauge_widgets, cfg["gauge_type"], None)
             if gauge_cls is None:

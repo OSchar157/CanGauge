@@ -26,3 +26,9 @@ def set_owner(owner, slot):
     current_owner = owner
     current_slot = slot
     worker.msg_buffer_emitter.connect(slot)
+
+def free():
+    global current_owner, current_slot
+    worker.msg_buffer_emitter.disconnect(current_slot)
+    current_owner = None
+    current_slot = None
