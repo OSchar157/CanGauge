@@ -92,8 +92,6 @@ pip install PyQt5 cantools "python-can==4.3.1"
 
 You'll also need Qt Virtual Keyboard for the on-screen keyboard (on Raspberry Pi OS, the `qtvirtualkeyboard-plugin` package).
 
-> **Why pin python-can?** Newer python-can releases break `import cantools` on Python 3.13 with `AttributeError: module 'can' has no attribute 'Listener'`. Version 4.3.1 avoids it.
-
 ## Usage
 
 Run from the `can_gauge_app/` directory.
