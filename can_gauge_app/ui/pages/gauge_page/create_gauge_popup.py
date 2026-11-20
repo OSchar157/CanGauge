@@ -34,7 +34,7 @@ class CreateGaugePopup(QDialog):
         master_layout.addWidget(desc_label)
 
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
-        self.showFullScreen()
+        # self.showFullScreen()
 
         self.gauge_section_layout = QHBoxLayout()
 

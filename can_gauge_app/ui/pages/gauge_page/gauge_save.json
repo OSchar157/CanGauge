@@ -1,0 +1,47 @@
+[
+  {
+    "layout_type": "SingleRowGaugeLayout",
+    "gauges": [
+      {
+        "slot": 0,
+        "can_id": 64,
+        "sig_name": "Engine_RPM",
+        "gauge_type": "EngineSpeedGauge",
+        "gauge_args": {
+          "val_offset": 0.0,
+          "val_scale": 0.001,
+          "min_val": 0.0,
+          "max_val": 8.0,
+          "warn_low": null,
+          "warn_high": null,
+          "danger_low": null,
+          "danger_high": 5.0,
+          "unit": "RPM",
+          "label": "x1000",
+          "major_ticks": 8,
+          "minor_ticks": 3
+        }
+      },
+      {
+        "slot": 1,
+        "can_id": 314,
+        "sig_name": "FR",
+        "gauge_type": "Speedometer",
+        "gauge_args": {
+          "val_offset": 0.0,
+          "val_scale": 0.621371,
+          "min_val": 0.0,
+          "max_val": 140.0,
+          "warn_low": null,
+          "warn_high": null,
+          "danger_low": null,
+          "danger_high": null,
+          "unit": "MPH",
+          "label": "Speed",
+          "major_ticks": 14,
+          "minor_ticks": 3
+        }
+      }
+    ]
+  }
+]

@@ -8,6 +8,8 @@ from ui.shell import Shell
 
 import app_state
 
+MIN_TEST_SPEED = 100
+
 bitrate = 250000
 using_can0 = True
 
@@ -34,8 +36,8 @@ if __name__ == "__main__":
         worker_manager.init_can(bus)
     elif len(sys.argv) == 2 and sys.argv[1] == "test":
         app_state.demo_mode = True
-        worker_manager.init_demo()
-    elif len(sys.argv) == 3 and sys.argv[1] == "test" and int(sys.argv[2]) >= 100:
+        worker_manager.init_demo(MIN_TEST_SPEED)
+    elif len(sys.argv) == 3 and sys.argv[1] == "test" and int(sys.argv[2]) >= MIN_TEST_SPEED:
         app_state.demo_mode = True
         worker_manager.init_demo(int(sys.argv[2]))
     else:
@@ -44,12 +46,12 @@ if __name__ == "__main__":
 
     db = cantools.database.Database()
     dbc_path = app_state.dbc_path()
-    db.add_dbc_string(open(f'../{dbc_path}').read())
+    db.add_dbc_string(open(f'../dbc/{dbc_path}').read())
     
     shell = Shell(can_db=db)
 
     shell.showFullScreen()
     # shell.showMaximized()
-    # shell.setFixedSize(1024, 600)
+    shell.setFixedSize(1024, 600)
     # shell.showNormal()
     sys.exit(app.exec_())
